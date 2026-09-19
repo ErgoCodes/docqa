@@ -61,7 +61,7 @@ pnpm lint                # ESLint en todos los paquetes
 
 Las tareas viven en Notion, no en comentarios `TODO` ni en un archivo del repo:
 
-{{NOTION_PROJECT_URL}}
+https://app.notion.com/p/3e019c33c39081348924d13fbfd11d15
 
 Al terminar una tarea, muévela de estado allí. Si aparece trabajo que no estaba
 planificado, créalo como tarea en el tablero en vez de dejarlo implícito en el

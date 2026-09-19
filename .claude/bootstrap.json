@@ -1,0 +1,20 @@
+{
+  "slug": "docqa",
+  "steps": {
+    "local_files": "done",
+    "github_repo": "done",
+    "notion_project": "done",
+    "notion_tasks": "done",
+    "cross_links": "done"
+  },
+  "github": {
+    "repo": "ErgoCodes/docqa",
+    "url": "https://github.com/ErgoCodes/docqa",
+    "visibility": "public"
+  },
+  "notion": {
+    "project_url": "https://app.notion.com/p/3e019c33c39081348924d13fbfd11d15",
+    "tasks_data_source_id": "91df7920-3960-4a86-b06b-9c3a296ea3e7",
+    "tasks_created": 20
+  }
+}
