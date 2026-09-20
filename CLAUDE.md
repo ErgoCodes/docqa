@@ -57,6 +57,28 @@ pnpm lint                # ESLint en todos los paquetes
 - Cobertura mínima del 80% en lógica de dominio (fragmentación, prompt, claves de
   caché, citas) — no en el proyecto entero.
 
+### Estructura de un módulo
+
+Cada módulo (`apps/api/src/modules/<nombre>/`) se organiza en carpetas por
+responsabilidad, no en archivos sueltos con nombres genéricos. Un archivo llamado
+`repository.ts` no dice si es un contrato o una implementación;
+`interfaces/user.repository.ts` sí.
+
+| Carpeta | Qué contiene |
+| --- | --- |
+| `interfaces/` | Contratos que el dominio necesita (puertos). Solo tipos, sin implementación. |
+| `types/` | Modelos y tipos del dominio. |
+| `schemas/` | Esquemas Zod de validación de entrada y salida. |
+| `services/` | Lógica de dominio. Depende de `interfaces/`, nunca de implementaciones concretas. |
+| `repositories/` | Implementaciones de persistencia (adaptadores de MongoDB u otros). |
+| `routes/` | Capa HTTP de Fastify: traduce peticiones a llamadas al servicio. |
+| `utils/` | Helpers puros y sin estado. |
+
+Un módulo crea solo las carpetas que necesita; no hay que rellenar el molde
+completo para un módulo pequeño. Los tests viven junto al archivo que prueban
+(`services/auth.service.test.ts`), y la dirección de las dependencias siempre
+apunta hacia `interfaces/`, nunca al revés.
+
 ## Seguimiento
 
 Las tareas viven en Notion, no en comentarios `TODO` ni en un archivo del repo:
