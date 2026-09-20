@@ -1,13 +1,25 @@
+import { loadConfig } from './config.js';
+import { createNoopDependencies } from './dependencies.js';
 import { buildServer } from './server.js';
 
-const app = buildServer();
+const config = loadConfig();
+const dependencies = createNoopDependencies();
+const app = await buildServer({ config, dependencies });
 
-const port = Number(process.env.API_PORT ?? 3000);
-const host = process.env.API_HOST ?? '0.0.0.0';
+async function shutdown(signal: string): Promise<void> {
+  app.log.info({ signal }, 'apagando');
+  await app.close();
+  await dependencies.close();
+  process.exit(0);
+}
 
-app
-  .listen({ port, host })
-  .catch((error: unknown) => {
-    app.log.error(error);
-    process.exit(1);
-  });
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
+
+try {
+  await app.listen({ port: config.API_PORT, host: config.API_HOST });
+} catch (error: unknown) {
+  app.log.error(error);
+  await dependencies.close();
+  process.exit(1);
+}
