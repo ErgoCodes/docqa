@@ -7,4 +7,5 @@ build/
 .DS_Store
 coverage/
 .turbo/
+.vite/
 pnpm-lock.yaml.bak
