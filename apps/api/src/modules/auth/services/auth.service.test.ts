@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createInMemoryRefreshTokenRepository, createInMemoryUserRepository } from '../../../testing/fakes.js';
+import type { UserRepository } from '../interfaces/user.repository.js';
 import { createArgon2Hasher } from '../utils/password-hasher.js';
+import { hashRefreshToken } from '../utils/refresh-token.js';
 import { createAuthService, type AuthService } from './auth.service.js';
 
 // memoryCost bajo a propósito, igual que en password-hasher.test.ts: se usa
@@ -50,6 +52,27 @@ describe('AuthService', () => {
         service.register('dup@example.com', 'otra-contrasena-larga'),
         'EMAIL_ALREADY_REGISTERED',
         409,
+      );
+    });
+
+    it('propaga sin convertir un error inesperado del repositorio', async () => {
+      const usersThatFail: UserRepository = {
+        insert: () => Promise.reject(new Error('fallo de conexión inesperado')),
+        findByEmail: () => Promise.resolve(null),
+        findById: () => Promise.resolve(null),
+      };
+      const service = createAuthService({
+        users: usersThatFail,
+        refreshTokens: createInMemoryRefreshTokenRepository(),
+        hasher,
+        signAccessToken: (payload) => `access-for-${payload.sub}`,
+        accessTokenTtlSeconds: 900,
+        refreshTokenTtlDays: 7,
+        refreshFamilyMaxDays: 30,
+      });
+
+      await expect(service.register('ana@example.com', 'contrasena-larga-123')).rejects.toThrow(
+        'fallo de conexión inesperado',
       );
     });
   });
@@ -102,6 +125,34 @@ describe('AuthService', () => {
 
       // el sucesor legítimo también queda invalidado: la familia entera murió
       await expectAppError(service.refresh(rotated.refreshToken), 'INVALID_REFRESH_TOKEN', 401);
+    });
+
+    it('revoca la familia y rechaza el refresh si el usuario asociado ya no existe', async () => {
+      const refreshTokens = createInMemoryRefreshTokenRepository();
+      const service = createAuthService({
+        users: createInMemoryUserRepository(),
+        refreshTokens,
+        hasher,
+        signAccessToken: (payload) => `access-for-${payload.sub}`,
+        accessTokenTtlSeconds: 900,
+        refreshTokenTtlDays: 7,
+        refreshFamilyMaxDays: 30,
+      });
+      const plainToken = 'token-de-un-usuario-que-fue-borrado';
+      const currentTime = new Date();
+      await refreshTokens.insert({
+        userId: 'usuario-que-ya-no-existe',
+        familyId: 'familia-huerfana',
+        tokenHash: hashRefreshToken(plainToken),
+        createdAt: currentTime,
+        expiresAt: new Date(currentTime.getTime() + 60 * 60 * 1000),
+        familyExpiresAt: new Date(currentTime.getTime() + 60 * 60 * 1000),
+      });
+
+      await expectAppError(service.refresh(plainToken), 'INVALID_REFRESH_TOKEN', 401);
+
+      const stored = await refreshTokens.findByTokenHash(hashRefreshToken(plainToken));
+      expect(stored?.revokedReason).toBe('user_deleted');
     });
 
     it('rechaza un token que no existe', async () => {

@@ -23,3 +23,27 @@ de Claude (Haiku).
 cp .env.example .env    # completar con tus claves
 docker compose up
 ```
+
+## Decisiones técnicas
+
+Notas puntuales sobre la implementación; el README completo con arquitectura,
+GIF y uso de IA es una tarea propia del tablero.
+
+**Autenticación (RF-01)**
+
+- El token de renovación es un valor **opaco** aleatorio, no un JWT: su
+  estado vive en MongoDB de todos modos, así que un JWT añadiría una segunda
+  fuente de verdad que puede contradecir a la primera. Se guarda su hash
+  SHA-256, nunca el token — y SHA-256, no Argon2, porque con 256 bits de
+  entropía no hay diccionario que atacar; Argon2 es para secretos de baja
+  entropía elegidos por humanos.
+- Cada renovación **rota** el token: el usado queda inservible y se emite
+  uno nuevo con la misma `familyId`. Si se reutiliza un token ya rotado, se
+  interpreta como robo y se revoca la familia entera, no solo ese token.
+  Compromiso conocido: dos pestañas refrescando en el mismo instante también
+  matan la familia (`replacedByHash` ya está en el esquema para añadir una
+  ventana de gracia si hiciera falta, sin migrar datos).
+- `db/indexes.ts` crea los índices con `createIndex` en el arranque, que es
+  idempotente salvo que cambien las opciones de un índice ya existente. Para
+  este tamaño de proyecto es suficiente; en producción sería una migración
+  versionada.
