@@ -41,3 +41,25 @@ export type LoginBody = z.infer<typeof loginBodySchema>;
 export const refreshBodySchema = z.object({ refreshToken: z.string().min(1) }).strict();
 
 export type RefreshBody = z.infer<typeof refreshBodySchema>;
+
+// Las respuestas se construyen con .parse(), no solo se tipan: z.object()
+// descarta claves desconocidas, así que es estructuralmente imposible que un
+// passwordHash se cuele en una respuesta aunque el servicio devolviera el
+// documento entero por error.
+export const authUserResponseSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  createdAt: z.date(),
+});
+
+export const authTokensResponseSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  tokenType: z.literal('Bearer'),
+  expiresIn: z.number(),
+});
+
+export const authResultResponseSchema = z.object({
+  user: authUserResponseSchema,
+  tokens: authTokensResponseSchema,
+});

@@ -4,6 +4,7 @@ import type { NewRefreshToken, RefreshTokenRepository } from '../modules/auth/in
 import type { NewUser, UserRepository } from '../modules/auth/interfaces/user.repository.js';
 import type { RefreshToken, RevokedReason } from '../modules/auth/types/refresh-token.js';
 import { DuplicateEmailError, type User } from '../modules/auth/types/user.js';
+import { createArgon2Hasher } from '../modules/auth/utils/password-hasher.js';
 
 export function createInMemoryUserRepository(): UserRepository {
   const usersByEmail = new Map<string, User>();
@@ -70,6 +71,9 @@ export function createInMemoryDependencies(): AppDependencies {
   return {
     users: createInMemoryUserRepository(),
     refreshTokens: createInMemoryRefreshTokenRepository(),
+    // Argon2 real con memoryCost mínimo, no un mock: cubre el camino
+    // crítico sin pagar su coste en cada test (~1-5ms por hash).
+    hasher: createArgon2Hasher({ memoryCost: 8, timeCost: 1, parallelism: 1 }),
     close: () => Promise.resolve(),
   };
 }
