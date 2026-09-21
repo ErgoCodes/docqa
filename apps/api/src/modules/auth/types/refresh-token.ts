@@ -1,4 +1,4 @@
-export type RevokedReason = 'rotated' | 'reuse_detected' | 'user_deleted';
+export type RevokedReason = 'rotated' | 'reuse_detected' | 'user_deleted' | 'logout';
 
 export interface RefreshToken {
   id: string;

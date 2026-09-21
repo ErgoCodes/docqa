@@ -17,3 +17,27 @@ export const passwordSchema = z
   .string()
   .min(12, 'La contraseña debe tener al menos 12 caracteres')
   .max(128, 'La contraseña no puede superar los 128 caracteres');
+
+// La contraseña de login no exige la política de registro (12-128): eso
+// filtraría la regla a quien solo está probando credenciales, y aceptaría
+// una cadena arbitrariamente larga que encarecería el argon2 de verify sin
+// motivo. Un tope generoso basta para no malgastar cómputo.
+const loginPasswordSchema = z.string().min(1).max(128);
+
+export const registerBodySchema = z
+  .object({ email: emailSchema, password: passwordSchema })
+  .strict()
+  .refine(({ email, password }) => password.toLowerCase() !== email, {
+    path: ['password'],
+    message: 'La contraseña no puede ser igual al email',
+  });
+
+export type RegisterBody = z.infer<typeof registerBodySchema>;
+
+export const loginBodySchema = z.object({ email: emailSchema, password: loginPasswordSchema }).strict();
+
+export type LoginBody = z.infer<typeof loginBodySchema>;
+
+export const refreshBodySchema = z.object({ refreshToken: z.string().min(1) }).strict();
+
+export type RefreshBody = z.infer<typeof refreshBodySchema>;
