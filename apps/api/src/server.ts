@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import type { AppConfig } from './config.js';
 import type { AppDependencies } from './dependencies.js';
 import { registerHealthRoutes } from './modules/health/routes/health.routes.js';
+import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { createLoggerOptions, registerSecurity } from './plugins/security.js';
 
@@ -17,6 +18,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
 
   registerErrorHandler(app);
   await registerSecurity(app, config);
+  await registerAuth(app, config);
 
   await app.register(registerHealthRoutes);
 
