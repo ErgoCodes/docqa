@@ -172,6 +172,10 @@ importers:
       zod:
         specifier: ^3.24.1
         version: 3.25.76
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^3.0.5
+        version: 3.2.7
 
   apps/frontend:
     dependencies:

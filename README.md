@@ -47,3 +47,15 @@ GIF y uso de IA es una tarea propia del tablero.
   idempotente salvo que cambien las opciones de un índice ya existente. Para
   este tamaño de proyecto es suficiente; en producción sería una migración
   versionada.
+
+**CI (RNF-12)**
+
+- Dos jobs en paralelo: `checks` (lint, tipos, tests unitarios y cobertura de
+  dominio en `api`) no depende de ningún servicio externo, así que da
+  feedback en segundos; `integration` levanta un contenedor de MongoDB solo
+  para las pruebas que sí lo necesitan (`test:integration`), sin frenar al
+  primero.
+- La cobertura del 80% (RNF-11) se comprueba con un script aparte,
+  `test:coverage`, en vez de forzarla dentro del `test` normal — así seguir
+  iterando en local con `pnpm test` no paga el costo de instrumentar
+  cobertura en cada corrida.
