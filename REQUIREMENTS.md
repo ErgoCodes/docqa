@@ -123,24 +123,28 @@ Flujo de trabajo sugerido: desarrollo guiado por especificaciones con Claude Cod
 
 ## 6. Modelo de datos
 
-Cuatro colecciones en MongoDB; los fragmentos guardan su propio `userId` para que la búsqueda vectorial pueda filtrar por usuario sin cruces.
+Cinco colecciones en MongoDB; los fragmentos guardan su propio `userId` para que la búsqueda vectorial pueda filtrar por usuario sin cruces.
 
 | Colección | Campos principales | Notas |
 | --- | --- | --- |
 | `users` | `_id`, `email` (único), `passwordHash`, `createdAt` | Índice único en `email` |
+| `refreshTokens` | `_id`, `userId`, `familyId`, `tokenHash`, `expiresAt`, `familyExpiresAt`, `createdAt`, `rotatedAt`, `revokedAt` | Se guarda el hash del token, nunca el token. Índice único en `tokenHash`, índice en `familyId` para revocar toda una cadena de rotación de una vez, e índice TTL en `expiresAt` |
 | `documents` | `_id`, `userId`, `title`, `storageKey`, `pages`, `status` (processing, ready, error), `error`, `createdAt` | `storageKey` apunta al archivo en MinIO |
 | `chunks` | `_id`, `userId`, `documentId`, `page`, `index`, `text`, `embedding` (vector; su tamaño depende del modelo de embeddings) | Índice vectorial en `embedding` con `userId` y `documentId` como filtros |
 | `conversations` | `_id`, `userId`, `documentIds`, `messages` (rol, contenido, citas con `chunkId`, `documentId` y `page`), `createdAt` | Las citas permiten reabrir el fragmento exacto |
 
+El token de renovación rota en cada uso: al canjearlo se invalida y se emite uno nuevo con la misma `familyId`. Si se intenta canjear un token ya rotado o revocado, se interpreta como un robo y se revoca toda la familia, forzando a iniciar sesión de nuevo.
+
 ## 7. API
 
-Doce endpoints REST; todos salvo registro, login, renovación y salud exigen token y operan solo sobre datos del usuario autenticado.
+Trece endpoints REST; todos salvo registro, login, renovación, cierre de sesión y salud exigen token y operan solo sobre datos del usuario autenticado.
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
 | POST | `/auth/register` | Crea un usuario |
 | POST | `/auth/login` | Devuelve token de acceso y de renovación |
 | POST | `/auth/refresh` | Renueva el token de acceso |
+| POST | `/auth/logout` | Revoca el token de renovación recibido, cerrando la sesión |
 | POST | `/documents` | Sube un PDF (multipart) y lo encola para procesarlo |
 | GET | `/documents` | Lista los documentos del usuario |
 | GET | `/documents/:id` | Detalle y estado de un documento |
