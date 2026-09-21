@@ -14,15 +14,21 @@ export interface ErrorDetail {
   message: string;
 }
 
+export interface ErrorDefinition {
+  readonly code: ErrorCode;
+  readonly statusCode: number;
+  readonly message: string;
+}
+
 export class AppError extends Error {
   readonly code: ErrorCode;
   readonly statusCode: number;
   readonly details?: ErrorDetail[];
 
-  constructor(code: ErrorCode, statusCode: number, message: string, details?: ErrorDetail[]) {
-    super(message);
-    this.code = code;
-    this.statusCode = statusCode;
+  constructor(definition: ErrorDefinition, details?: ErrorDetail[]) {
+    super(definition.message);
+    this.code = definition.code;
+    this.statusCode = definition.statusCode;
     this.details = details;
   }
 }

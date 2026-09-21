@@ -40,7 +40,7 @@ export async function registerAuth(app: FastifyInstance, config: AppConfig): Pro
       await request.jwtVerify();
     } catch {
       reply.header('WWW-Authenticate', 'Bearer');
-      throw new AppError('UNAUTHORIZED', 401, 'Token de acceso ausente o inválido');
+      throw new AppError({ code: 'UNAUTHORIZED', statusCode: 401, message: 'Token de acceso ausente o inválido' });
     }
 
     // request.user ya viene tipado como AccessTokenPayload por el
@@ -48,7 +48,7 @@ export async function registerAuth(app: FastifyInstance, config: AppConfig): Pro
     const result = accessTokenPayloadSchema.safeParse(request.user);
     if (!result.success) {
       reply.header('WWW-Authenticate', 'Bearer');
-      throw new AppError('UNAUTHORIZED', 401, 'Token de acceso inválido');
+      throw new AppError({ code: 'UNAUTHORIZED', statusCode: 401, message: 'Token de acceso inválido' });
     }
   });
 }

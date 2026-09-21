@@ -14,7 +14,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
 
   app.setNotFoundHandler((request, reply) => {
     const { statusCode, body } = mapErrorToResponse(
-      new AppError('NOT_FOUND', 404, 'Recurso no encontrado'),
+      new AppError({ code: 'NOT_FOUND', statusCode: 404, message: 'Recurso no encontrado' }),
       request.id,
     );
     void reply.status(statusCode).send(body);

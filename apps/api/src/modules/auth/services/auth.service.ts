@@ -4,11 +4,9 @@ import type { RefreshTokenRepository } from '../interfaces/refresh-token.reposit
 import type { PasswordHasher } from '../interfaces/password-hasher.js';
 import type { UserRepository } from '../interfaces/user.repository.js';
 import type { AccessTokenPayload } from '../types/access-token.js';
+import { AuthErrors } from '../types/auth-errors.js';
 import { DuplicateEmailError, type User } from '../types/user.js';
 import { generateRefreshToken, hashRefreshToken } from '../utils/refresh-token.js';
-
-const INVALID_CREDENTIALS_MESSAGE = 'Email o contraseña incorrectos';
-const INVALID_REFRESH_TOKEN_MESSAGE = 'El token de renovación no es válido';
 
 export interface AuthServiceDependencies {
   users: UserRepository;
@@ -98,7 +96,7 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
         user = await users.insert({ email, passwordHash, createdAt: now() });
       } catch (error: unknown) {
         if (error instanceof DuplicateEmailError) {
-          throw new AppError('EMAIL_ALREADY_REGISTERED', 409, 'Ya existe una cuenta con ese email');
+          throw new AppError(AuthErrors.EMAIL_ALREADY_REGISTERED);
         }
         throw error;
       }
@@ -114,12 +112,12 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
         // verify) y "contraseña incorrecta" (con verify) delataría qué
         // emails están registrados, aunque el mensaje de error sea idéntico.
         await hasher.verify(await getDecoyHash(), password);
-        throw new AppError('INVALID_CREDENTIALS', 401, INVALID_CREDENTIALS_MESSAGE);
+        throw new AppError(AuthErrors.INVALID_CREDENTIALS);
       }
 
       const isValidPassword = await hasher.verify(user.passwordHash, password);
       if (!isValidPassword) {
-        throw new AppError('INVALID_CREDENTIALS', 401, INVALID_CREDENTIALS_MESSAGE);
+        throw new AppError(AuthErrors.INVALID_CREDENTIALS);
       }
 
       return { user: toAuthUser(user), tokens: await issueNewSession(user.id) };
@@ -130,7 +128,7 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
       const record = await refreshTokens.findByTokenHash(tokenHash);
 
       if (!record) {
-        throw new AppError('INVALID_REFRESH_TOKEN', 401, INVALID_REFRESH_TOKEN_MESSAGE);
+        throw new AppError(AuthErrors.INVALID_REFRESH_TOKEN);
       }
 
       const currentTime = now();
@@ -139,17 +137,17 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
         // Un token ya rotado o revocado que vuelve a usarse es la señal de
         // un robo: se revoca toda la familia, no solo este token.
         await refreshTokens.revokeFamily(record.familyId, 'reuse_detected', currentTime);
-        throw new AppError('INVALID_REFRESH_TOKEN', 401, INVALID_REFRESH_TOKEN_MESSAGE);
+        throw new AppError(AuthErrors.INVALID_REFRESH_TOKEN);
       }
 
       if (currentTime >= record.expiresAt || currentTime >= record.familyExpiresAt) {
-        throw new AppError('INVALID_REFRESH_TOKEN', 401, INVALID_REFRESH_TOKEN_MESSAGE);
+        throw new AppError(AuthErrors.INVALID_REFRESH_TOKEN);
       }
 
       const user = await users.findById(record.userId);
       if (!user) {
         await refreshTokens.revokeFamily(record.familyId, 'user_deleted', currentTime);
-        throw new AppError('INVALID_REFRESH_TOKEN', 401, INVALID_REFRESH_TOKEN_MESSAGE);
+        throw new AppError(AuthErrors.INVALID_REFRESH_TOKEN);
       }
 
       const { token: newToken, tokenHash: newTokenHash } = generateRefreshToken();
@@ -160,7 +158,7 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
         // findByTokenHash de arriba y este compare-and-set: se trata igual
         // que una reutilización, o la protección sería decorativa.
         await refreshTokens.revokeFamily(record.familyId, 'reuse_detected', currentTime);
-        throw new AppError('INVALID_REFRESH_TOKEN', 401, INVALID_REFRESH_TOKEN_MESSAGE);
+        throw new AppError(AuthErrors.INVALID_REFRESH_TOKEN);
       }
 
       await refreshTokens.insert({

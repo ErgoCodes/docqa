@@ -4,7 +4,7 @@ import { AppError, mapErrorToResponse } from './errors.js';
 
 describe('mapErrorToResponse', () => {
   it('mapea un AppError a su código y estado propios', () => {
-    const error = new AppError('EMAIL_ALREADY_REGISTERED', 409, 'Ya existe una cuenta con ese email');
+    const error = new AppError({ code: 'EMAIL_ALREADY_REGISTERED', statusCode: 409, message: 'Ya existe una cuenta con ese email' });
 
     const result = mapErrorToResponse(error, 'req-1');
 
@@ -16,7 +16,7 @@ describe('mapErrorToResponse', () => {
   });
 
   it('incluye los details de un AppError cuando existen', () => {
-    const error = new AppError('VALIDATION_ERROR', 400, 'Datos inválidos', [
+    const error = new AppError({ code: 'VALIDATION_ERROR', statusCode: 400, message: 'Datos inválidos' }, [
       { path: 'email', message: 'Email inválido' },
     ]);
 
