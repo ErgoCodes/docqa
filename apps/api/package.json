@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "vitest run",
+    "test:integration": "MONGODB_TEST_URI=mongodb://localhost:27017/?directConnection=true vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint ."
   },
@@ -15,6 +16,7 @@
     "@fastify/cors": "^11.3.0",
     "@fastify/helmet": "^13.1.1",
     "fastify": "^5.2.1",
+    "mongodb": "^6.21.0",
     "zod": "^3.24.1"
   }
 }
