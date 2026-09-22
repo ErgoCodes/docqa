@@ -3,11 +3,23 @@ import type { FastifyInstance } from 'fastify';
 import { PDFDocument } from 'pdf-lib';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildTestApp } from '../../../testing/build-test-app.js';
+import { createInMemoryChunkSearcher, createInMemoryLlmProvider } from '../../../testing/fakes.js';
 
 interface ConversationResponseBody {
   id: string;
   documentIds: string[];
   messages: unknown[];
+  createdAt: string;
+}
+
+interface MessageResponseBody {
+  role: 'user' | 'assistant';
+  content: string;
+  citations: Array<{
+    chunkId: string;
+    documentId: string;
+    page: number;
+  }>;
   createdAt: string;
 }
 
@@ -124,5 +136,135 @@ describe('conversation routes', () => {
     expect(res.statusCode).toBe(404);
     const body = res.json<ErrorResponseBody>();
     expect(body.error.code).toBe('CONVERSATION_DOCUMENT_NOT_FOUND');
+  });
+
+  describe('POST /conversations/:id/messages', () => {
+    it('rejects unauthenticated requests with 401', async () => {
+      ({ app } = await buildTestApp());
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/conversations/conv-123/messages',
+        payload: { question: 'What is this about?' },
+      });
+
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('rejects invalid body payload with 400', async () => {
+      ({ app } = await buildTestApp());
+      const token = await registerAndGetToken(app, 'user-body@example.com');
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        headers: { authorization: `Bearer ${token}` },
+        payload: {},
+      });
+      const conv = createRes.json<ConversationResponseBody>();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/conversations/${conv.id}/messages`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { question: '   ' },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('successfully sends message, returns assistant response with X-Cache: MISS header', async () => {
+      const mockChunks = [
+        {
+          id: 'chunk-1',
+          documentId: 'doc-1',
+          userId: 'mock-user',
+          page: 1,
+          index: 0,
+          text: 'Chunk content.',
+          score: 0.9,
+        },
+      ];
+
+      ({ app } = await buildTestApp({
+        dependencies: {
+          chunkSearcher: createInMemoryChunkSearcher(mockChunks),
+          llmProvider: createInMemoryLlmProvider('Generated assistant answer based on chunk.'),
+        },
+      }));
+
+      const token = await registerAndGetToken(app, 'user-chat@example.com');
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        headers: { authorization: `Bearer ${token}` },
+        payload: {},
+      });
+      const conv = createRes.json<ConversationResponseBody>();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/conversations/${conv.id}/messages`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { question: 'Explain the topic' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['x-cache']).toBe('MISS');
+
+      const message = res.json<MessageResponseBody>();
+      expect(message.role).toBe('assistant');
+      expect(message.content).toBe('Generated assistant answer based on chunk.');
+      expect(message.citations).toEqual([
+        {
+          chunkId: 'chunk-1',
+          documentId: 'doc-1',
+          page: 1,
+        },
+      ]);
+      expect(message.createdAt).toBeDefined();
+    });
+
+    it('RNF-01: returns 404 CONVERSATION_NOT_FOUND when user B sends a message to conversation of user A', async () => {
+      ({ app } = await buildTestApp());
+      const tokenUserA = await registerAndGetToken(app, 'owner@example.com');
+      const tokenUserB = await registerAndGetToken(app, 'intruder@example.com');
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        headers: { authorization: `Bearer ${tokenUserA}` },
+        payload: {},
+      });
+      const conv = createRes.json<ConversationResponseBody>();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: `/conversations/${conv.id}/messages`,
+        headers: { authorization: `Bearer ${tokenUserB}` },
+        payload: { question: 'Can I see your conversation?' },
+      });
+
+      expect(res.statusCode).toBe(404);
+      const body = res.json<ErrorResponseBody>();
+      expect(body.error.code).toBe('CONVERSATION_NOT_FOUND');
+    });
+
+    it('returns 404 CONVERSATION_NOT_FOUND when conversation does not exist', async () => {
+      ({ app } = await buildTestApp());
+      const token = await registerAndGetToken(app, 'user-notfound@example.com');
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/conversations/non-existent-conv/messages',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { question: 'Hello?' },
+      });
+
+      expect(res.statusCode).toBe(404);
+      const body = res.json<ErrorResponseBody>();
+      expect(body.error.code).toBe('CONVERSATION_NOT_FOUND');
+    });
   });
 });

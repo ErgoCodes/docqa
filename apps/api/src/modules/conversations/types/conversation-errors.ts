@@ -1,6 +1,11 @@
 import type { ErrorDefinition } from '../../../errors.js';
 
 export const ConversationErrors = {
+  NOT_FOUND: {
+    code: 'CONVERSATION_NOT_FOUND',
+    statusCode: 404,
+    message: 'Conversation not found or does not belong to the user',
+  },
   DOCUMENT_NOT_FOUND: {
     code: 'CONVERSATION_DOCUMENT_NOT_FOUND',
     statusCode: 404,

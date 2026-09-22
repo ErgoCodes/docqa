@@ -10,12 +10,13 @@ import type { ChunkReader } from '../modules/chunks/interfaces/chunk-reader.js';
 import type { ChunkSearcher } from '../modules/chunks/interfaces/chunk-searcher.js';
 import type { Chunk, ChunkSearchResult } from '../modules/chunks/types/chunk.js';
 import type { ConversationRepository } from '../modules/conversations/interfaces/conversation.repository.js';
-import type { Conversation, NewConversation } from '../modules/conversations/types/conversation.js';
+import type { Conversation, Message, NewConversation } from '../modules/conversations/types/conversation.js';
 import type { DocumentRepository } from '../modules/documents/interfaces/document.repository.js';
 import type { IngestionQueue } from '../modules/documents/interfaces/ingestion-queue.js';
 import type { ObjectStorage } from '../modules/documents/interfaces/object-storage.js';
 import type { Document, NewDocument } from '../modules/documents/types/document.js';
 import type { EmbeddingsProvider } from '../modules/embeddings/interfaces/embeddings-provider.js';
+import type { LlmProvider } from '../modules/llm/interfaces/llm-provider.js';
 
 export function createInMemoryUserRepository(): UserRepository {
   const usersByEmail = new Map<string, User>();
@@ -129,6 +130,27 @@ export function createInMemoryConversationRepository(): ConversationRepository {
       conversations.set(stored.id, stored);
       return Promise.resolve(stored);
     },
+
+    findById: (id: string, userId: string): Promise<Conversation | null> => {
+      const conv = conversations.get(id);
+      if (!conv || conv.userId !== userId) {
+        return Promise.resolve(null);
+      }
+      return Promise.resolve(conv);
+    },
+
+    appendMessages: (id: string, userId: string, messages: Message[]): Promise<Conversation | null> => {
+      const conv = conversations.get(id);
+      if (!conv || conv.userId !== userId) {
+        return Promise.resolve(null);
+      }
+      const updated: Conversation = {
+        ...conv,
+        messages: [...conv.messages, ...messages],
+      };
+      conversations.set(id, updated);
+      return Promise.resolve(updated);
+    },
   };
 }
 
@@ -157,6 +179,12 @@ export function createInMemoryChunkSearcher(results: ChunkSearchResult[] = []): 
 export function createInMemoryEmbeddingsProvider(): EmbeddingsProvider {
   return {
     embed: (texts: string[]): Promise<number[][]> => Promise.resolve(texts.map(() => [])),
+  };
+}
+
+export function createInMemoryLlmProvider(response = 'stub answer'): LlmProvider {
+  return {
+    generate: (): Promise<string> => Promise.resolve(response),
   };
 }
 
@@ -204,6 +232,7 @@ export function createInMemoryDependencies(): AppDependencies {
     chunkReader: createInMemoryChunkReader(),
     chunkSearcher: createInMemoryChunkSearcher(),
     embeddingsProvider: createInMemoryEmbeddingsProvider(),
+    llmProvider: createInMemoryLlmProvider(),
     // Argon2 real con memoryCost mínimo, no un mock: cubre el camino
     // crítico sin pagar su coste en cada test (~1-5ms por hash).
     hasher: createArgon2Hasher({ memoryCost: 8, timeCost: 1, parallelism: 1 }),

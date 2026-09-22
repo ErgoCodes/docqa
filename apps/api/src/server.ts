@@ -5,6 +5,7 @@ import { registerAuthRoutes } from './modules/auth/routes/auth.routes.js';
 import { createAuthService } from './modules/auth/services/auth.service.js';
 import { registerChunkRoutes } from './modules/chunks/routes/chunk.routes.js';
 import { createGetChunkService } from './modules/chunks/services/get-chunk.service.js';
+import { createSearchChunksService } from './modules/chunks/services/search-chunks.service.js';
 import { registerConversationRoutes } from './modules/conversations/routes/conversation.routes.js';
 import { createConversationService } from './modules/conversations/services/conversation.service.js';
 import { registerDocumentRoutes } from './modules/documents/routes/document.routes.js';
@@ -49,9 +50,16 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
 
   const chunkService = createGetChunkService({ chunkReader: dependencies.chunkReader });
 
+  const searchChunksService = createSearchChunksService({
+    embeddingsProvider: dependencies.embeddingsProvider,
+    chunkSearcher: dependencies.chunkSearcher,
+  });
+
   const conversationService = createConversationService({
     conversations: dependencies.conversations,
     documents: dependencies.documents,
+    searchChunks: searchChunksService,
+    llmProvider: dependencies.llmProvider,
   });
 
   await app.register(registerHealthRoutes);

@@ -25,6 +25,8 @@ const configSchema = z.object({
   ARGON2_PARALLELISM: z.coerce.number().int().min(1).default(1),
   VOYAGE_API_KEY: z.string().min(1),
   EMBEDDINGS_MODEL: z.string().min(1).default('voyage-3-lite'),
+  CLAUDE_API_KEY: z.string().min(1),
+  CLAUDE_MODEL: z.string().min(1).default('claude-haiku-4-5'),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
