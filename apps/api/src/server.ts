@@ -3,6 +3,8 @@ import type { AppConfig } from './config.js';
 import type { AppDependencies } from './dependencies.js';
 import { registerAuthRoutes } from './modules/auth/routes/auth.routes.js';
 import { createAuthService } from './modules/auth/services/auth.service.js';
+import { registerConversationRoutes } from './modules/conversations/routes/conversation.routes.js';
+import { createConversationService } from './modules/conversations/services/conversation.service.js';
 import { registerDocumentRoutes } from './modules/documents/routes/document.routes.js';
 import { createDocumentService } from './modules/documents/services/document.service.js';
 import { registerHealthRoutes } from './modules/health/routes/health.routes.js';
@@ -43,9 +45,15 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
     chunkDeleter: dependencies.chunkDeleter,
   });
 
+  const conversationService = createConversationService({
+    conversations: dependencies.conversations,
+    documents: dependencies.documents,
+  });
+
   await app.register(registerHealthRoutes);
   await app.register(registerAuthRoutes, { service: authService });
   await app.register(registerDocumentRoutes, { service: documentService });
+  await app.register(registerConversationRoutes, { service: conversationService });
 
   return app;
 }

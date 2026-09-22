@@ -12,6 +12,8 @@ import { createMongoUserRepository } from './modules/auth/repositories/mongo-use
 import { createArgon2Hasher } from './modules/auth/utils/password-hasher.js';
 import type { ChunkDeleter } from './modules/chunks/interfaces/chunk-deleter.js';
 import { createMongoChunkDeleter } from './modules/chunks/repositories/mongo-chunk-deleter.js';
+import type { ConversationRepository } from './modules/conversations/interfaces/conversation.repository.js';
+import { createMongoConversationRepository } from './modules/conversations/repositories/mongo-conversation.repository.js';
 import type { DocumentRepository } from './modules/documents/interfaces/document.repository.js';
 import type { IngestionQueue } from './modules/documents/interfaces/ingestion-queue.js';
 import type { ObjectStorage } from './modules/documents/interfaces/object-storage.js';
@@ -26,6 +28,7 @@ export interface AppDependencies {
   users: UserRepository;
   refreshTokens: RefreshTokenRepository;
   documents: DocumentRepository;
+  conversations: ConversationRepository;
   objectStorage: ObjectStorage;
   ingestionQueue: IngestionQueue;
   chunkDeleter: ChunkDeleter;
@@ -47,6 +50,7 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
     users: createMongoUserRepository(db),
     refreshTokens: createMongoRefreshTokenRepository(db),
     documents: createMongoDocumentRepository(db),
+    conversations: createMongoConversationRepository(db),
     objectStorage: createMinioObjectStorage(minioClient, config.MINIO_BUCKET),
     ingestionQueue: createBullmqIngestionQueue(bullmqQueue),
     chunkDeleter: createMongoChunkDeleter(db),

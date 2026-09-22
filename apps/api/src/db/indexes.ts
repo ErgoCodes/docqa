@@ -19,4 +19,5 @@ export async function ensureIndexes(db: Db): Promise<void> {
   await refreshTokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
   await db.collection('documents').createIndex({ userId: 1, createdAt: -1 });
+  await db.collection('conversations').createIndex({ userId: 1, createdAt: -1 });
 }
