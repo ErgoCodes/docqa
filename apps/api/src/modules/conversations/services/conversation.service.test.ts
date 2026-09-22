@@ -64,6 +64,7 @@ function createMockDependencies() {
         Array.from(storedDocuments.values()).filter((d) => d.userId === userId),
       );
     }),
+    deleteById: vi.fn((): Promise<boolean> => Promise.resolve(false)),
   };
 
   const conversations: ConversationRepository = {
