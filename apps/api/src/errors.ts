@@ -7,6 +7,10 @@ export type ErrorCode =
   | 'INVALID_REFRESH_TOKEN'
   | 'UNAUTHORIZED'
   | 'NOT_FOUND'
+  | 'INVALID_FILE_TYPE'
+  | 'FILE_TOO_LARGE'
+  | 'TOO_MANY_PAGES'
+  | 'DOCUMENT_NOT_FOUND'
   | 'INTERNAL_ERROR';
 
 export interface ErrorDetail {
@@ -70,6 +74,13 @@ export function mapErrorToResponse(error: unknown, requestId: string): MappedErr
     return {
       statusCode: 400,
       body: buildErrorResponse(requestId, 'VALIDATION_ERROR', 'Los datos enviados no son válidos', details),
+    };
+  }
+
+  if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'FST_REQ_FILE_TOO_LARGE') {
+    return {
+      statusCode: 413,
+      body: buildErrorResponse(requestId, 'FILE_TOO_LARGE', 'El archivo no puede superar los 10 MB'),
     };
   }
 
