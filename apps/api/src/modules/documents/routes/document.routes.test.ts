@@ -55,6 +55,9 @@ describe('rutas de documentos', () => {
 
       const getByIdRes = await app.inject({ method: 'GET', url: '/documents/doc-123' });
       expect(getByIdRes.statusCode).toBe(401);
+
+      const deleteRes = await app.inject({ method: 'DELETE', url: '/documents/doc-123' });
+      expect(deleteRes.statusCode).toBe(401);
     });
   });
 
@@ -122,6 +125,96 @@ describe('rutas de documentos', () => {
       });
       expect(detailUserBRes.statusCode).toBe(404);
       expect(detailUserBRes.json<ErrorResponseBody>().error.code).toBe('DOCUMENT_NOT_FOUND');
+    });
+  });
+
+  describe('borrado y aislamiento RNF-01', () => {
+    it('sube, borra y comprueba que deja de aparecer en detalle y listado', async () => {
+      ({ app } = await buildTestApp());
+      const token = await registerAndGetToken(app, 'delete-flow@example.com');
+
+      const pdfBuffer = await buildPdfBuffer(1);
+      const form = new FormData();
+      form.append('file', new Blob([pdfBuffer], { type: 'application/pdf' }), 'a-borrar.pdf');
+
+      const uploadRes = await app.inject({
+        method: 'POST',
+        url: '/documents',
+        headers: { authorization: `Bearer ${token}` },
+        payload: form,
+      });
+      const createdDoc = uploadRes.json<DocumentResponseBody>();
+
+      const deleteRes = await app.inject({
+        method: 'DELETE',
+        url: `/documents/${createdDoc.id}`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(deleteRes.statusCode).toBe(204);
+      expect(deleteRes.body).toBe('');
+
+      const getByIdRes = await app.inject({
+        method: 'GET',
+        url: `/documents/${createdDoc.id}`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(getByIdRes.statusCode).toBe(404);
+      expect(getByIdRes.json<ErrorResponseBody>().error.code).toBe('DOCUMENT_NOT_FOUND');
+
+      const listRes = await app.inject({
+        method: 'GET',
+        url: '/documents',
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(listRes.json<DocumentResponseBody[]>()).toHaveLength(0);
+    });
+
+    it('DELETE sobre un id inexistente devuelve 404 DOCUMENT_NOT_FOUND', async () => {
+      ({ app } = await buildTestApp());
+      const token = await registerAndGetToken(app, 'delete-404@example.com');
+
+      const res = await app.inject({
+        method: 'DELETE',
+        url: '/documents/id-que-no-existe',
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json<ErrorResponseBody>().error.code).toBe('DOCUMENT_NOT_FOUND');
+    });
+
+    it('RNF-01: el usuario B no puede borrar un documento del usuario A, que sigue intacto', async () => {
+      ({ app } = await buildTestApp());
+      const tokenUserA = await registerAndGetToken(app, 'delete-userA@example.com');
+      const tokenUserB = await registerAndGetToken(app, 'delete-userB@example.com');
+
+      const pdfBuffer = await buildPdfBuffer(1);
+      const form = new FormData();
+      form.append('file', new Blob([pdfBuffer], { type: 'application/pdf' }), 'de-usuario-a.pdf');
+
+      const uploadRes = await app.inject({
+        method: 'POST',
+        url: '/documents',
+        headers: { authorization: `Bearer ${tokenUserA}` },
+        payload: form,
+      });
+      const createdDoc = uploadRes.json<DocumentResponseBody>();
+
+      const deleteByUserBRes = await app.inject({
+        method: 'DELETE',
+        url: `/documents/${createdDoc.id}`,
+        headers: { authorization: `Bearer ${tokenUserB}` },
+      });
+      expect(deleteByUserBRes.statusCode).toBe(404);
+      expect(deleteByUserBRes.json<ErrorResponseBody>().error.code).toBe('DOCUMENT_NOT_FOUND');
+
+      const detailUserARes = await app.inject({
+        method: 'GET',
+        url: `/documents/${createdDoc.id}`,
+        headers: { authorization: `Bearer ${tokenUserA}` },
+      });
+      expect(detailUserARes.statusCode).toBe(200);
+      expect(detailUserARes.json<DocumentResponseBody>()).toEqual(createdDoc);
     });
   });
 
