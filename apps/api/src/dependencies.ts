@@ -27,6 +27,8 @@ import { createMinioObjectStorage } from './modules/documents/repositories/minio
 import { createMongoDocumentRepository } from './modules/documents/repositories/mongo-document.repository.js';
 import type { EmbeddingsProvider } from './modules/embeddings/interfaces/embeddings-provider.js';
 import { createVoyageEmbeddingsProvider } from './modules/embeddings/repositories/voyage-embeddings.provider.js';
+import type { LlmProvider } from './modules/llm/interfaces/llm-provider.js';
+import { createClaudeLlmProvider } from './modules/llm/repositories/claude-llm.provider.js';
 
 export interface AppDependencies {
   users: UserRepository;
@@ -38,6 +40,7 @@ export interface AppDependencies {
   chunkDeleter: ChunkDeleter;
   chunkSearcher: ChunkSearcher;
   embeddingsProvider: EmbeddingsProvider;
+  llmProvider: LlmProvider;
   hasher: PasswordHasher;
   close: () => Promise<void>;
 }
@@ -64,6 +67,10 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
     embeddingsProvider: createVoyageEmbeddingsProvider({
       apiKey: config.VOYAGE_API_KEY,
       model: config.EMBEDDINGS_MODEL,
+    }),
+    llmProvider: createClaudeLlmProvider({
+      apiKey: config.CLAUDE_API_KEY,
+      model: config.CLAUDE_MODEL,
     }),
     hasher: createArgon2Hasher({
       memoryCost: config.ARGON2_MEMORY_COST,

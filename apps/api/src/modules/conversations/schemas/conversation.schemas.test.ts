@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { conversationResponseSchema, createConversationBodySchema } from './conversation.schemas.js';
+import {
+  conversationIdParamsSchema,
+  conversationResponseSchema,
+  createConversationBodySchema,
+  messageResponseSchema,
+  sendMessageBodySchema,
+} from './conversation.schemas.js';
 
 describe('createConversationBodySchema', () => {
   it('defaults documentIds to empty array when omitted', () => {
@@ -27,6 +33,85 @@ describe('createConversationBodySchema', () => {
       createConversationBodySchema.parse({
         documentIds: ['a'],
         extraField: 'not-allowed',
+      }),
+    ).toThrow();
+  });
+});
+
+describe('conversationIdParamsSchema', () => {
+  it('parses valid id parameter', () => {
+    const parsed = conversationIdParamsSchema.parse({ id: 'conv-123' });
+    expect(parsed).toEqual({ id: 'conv-123' });
+  });
+
+  it('rejects empty string id', () => {
+    expect(() => conversationIdParamsSchema.parse({ id: '' })).toThrow();
+  });
+
+  it('rejects undeclared extra fields', () => {
+    expect(() => conversationIdParamsSchema.parse({ id: 'conv-123', extra: 'foo' })).toThrow();
+  });
+});
+
+describe('sendMessageBodySchema', () => {
+  it('parses valid question string and trims whitespace', () => {
+    const parsed = sendMessageBodySchema.parse({ question: '  What is RAG?  ' });
+    expect(parsed).toEqual({ question: 'What is RAG?' });
+  });
+
+  it('rejects empty or whitespace-only question', () => {
+    expect(() => sendMessageBodySchema.parse({ question: '' })).toThrow();
+    expect(() => sendMessageBodySchema.parse({ question: '   ' })).toThrow();
+  });
+
+  it('rejects question exceeding 2000 characters', () => {
+    expect(() => sendMessageBodySchema.parse({ question: 'a'.repeat(2001) })).toThrow();
+    expect(sendMessageBodySchema.parse({ question: 'a'.repeat(2000) })).toEqual({
+      question: 'a'.repeat(2000),
+    });
+  });
+
+  it('rejects undeclared extra fields', () => {
+    expect(() =>
+      sendMessageBodySchema.parse({
+        question: 'Valid question',
+        extraField: 'disallowed',
+      }),
+    ).toThrow();
+  });
+});
+
+describe('messageResponseSchema', () => {
+  it('parses valid message response object', () => {
+    const now = new Date();
+    const parsed = messageResponseSchema.parse({
+      role: 'assistant',
+      content: 'This is the answer.',
+      citations: [
+        {
+          chunkId: 'chunk-1',
+          documentId: 'doc-1',
+          page: 2,
+        },
+      ],
+      createdAt: now,
+    });
+
+    expect(parsed).toEqual({
+      role: 'assistant',
+      content: 'This is the answer.',
+      citations: [{ chunkId: 'chunk-1', documentId: 'doc-1', page: 2 }],
+      createdAt: now,
+    });
+  });
+
+  it('rejects non-positive page number in citation', () => {
+    expect(() =>
+      messageResponseSchema.parse({
+        role: 'assistant',
+        content: 'Answer',
+        citations: [{ chunkId: 'chunk-1', documentId: 'doc-1', page: 0 }],
+        createdAt: new Date(),
       }),
     ).toThrow();
   });

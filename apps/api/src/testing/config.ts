@@ -26,6 +26,8 @@ export function createTestConfig(overrides: Partial<AppConfig> = {}): AppConfig 
     ARGON2_PARALLELISM: 1,
     VOYAGE_API_KEY: 'test-voyage-key',
     EMBEDDINGS_MODEL: 'voyage-3-lite',
+    CLAUDE_API_KEY: 'test-claude-key',
+    CLAUDE_MODEL: 'claude-haiku-4-5',
     ...overrides,
   };
 }

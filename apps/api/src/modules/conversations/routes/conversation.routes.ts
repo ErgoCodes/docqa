@@ -1,5 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { conversationResponseSchema, createConversationBodySchema } from '../schemas/conversation.schemas.js';
+import {
+  conversationIdParamsSchema,
+  conversationResponseSchema,
+  createConversationBodySchema,
+  messageResponseSchema,
+  sendMessageBodySchema,
+} from '../schemas/conversation.schemas.js';
 import type { ConversationService } from '../services/conversation.service.js';
 
 export interface ConversationRoutesOptions {
@@ -12,6 +18,14 @@ export const registerConversationRoutes: FastifyPluginAsync<ConversationRoutesOp
     const conversation = await service.create(request.user.sub, body.documentIds);
     void reply.status(201);
     return conversationResponseSchema.parse(conversation);
+  });
+
+  app.post('/conversations/:id/messages', { preHandler: app.authenticate }, async (request, reply) => {
+    const params = conversationIdParamsSchema.parse(request.params);
+    const body = sendMessageBodySchema.parse(request.body);
+    const result = await service.sendMessage(request.user.sub, params.id, body.question);
+    void reply.header('X-Cache', 'MISS');
+    return messageResponseSchema.parse(result);
   });
 
   return Promise.resolve();
