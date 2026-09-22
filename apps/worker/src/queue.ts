@@ -1,12 +1,25 @@
 import type { Job } from 'bullmq';
+import type { PdfExtractionService } from './modules/extraction/services/pdf-extraction.service.js';
+import type { IngestionJob } from './modules/ingestion/types/ingestion-job.js';
 
 export const QUEUE_NAME = 'ingestion';
 
-/**
- * Placeholder de ingesta — la extracción/fragmentación/embeddings reales
- * llegan en la Fase 2 (tareas de ingesta). Por ahora solo confirma que el
- * worker está cableado a la cola.
- */
-export async function processor(job: Job): Promise<void> {
-  await job.log(`processing job ${job.id} (placeholder, no-op)`);
+export interface ProcessorDependencies {
+  extraction: PdfExtractionService;
+}
+
+export function createProcessor(deps: ProcessorDependencies) {
+  return async (job: Job<IngestionJob>): Promise<void> => {
+    const { documentId } = job.data;
+    await job.log(`starting extraction for document ${documentId}`);
+
+    const pages = await deps.extraction.run(documentId);
+
+    if (pages === null) {
+      await job.log(`document ${documentId} not found, skipping (likely deleted before processing)`);
+      return;
+    }
+
+    await job.log(`extracted ${pages.length} pages for document ${documentId}`);
+  };
 }

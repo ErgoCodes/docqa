@@ -12,7 +12,7 @@ export async function connectMongo(uri: string): Promise<MongoConnection> {
     await client.connect();
   } catch (error: unknown) {
     const cause = error instanceof Error ? error.message : String(error);
-    throw new Error(`No se pudo conectar a MongoDB. ¿Has ejecutado \`docker compose up\`? (${cause})`);
+    throw new Error(`Could not connect to MongoDB. Have you run \`docker compose up\`? (${cause})`);
   }
 
   return { client, db: client.db() };
