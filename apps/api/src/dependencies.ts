@@ -11,8 +11,10 @@ import { createMongoRefreshTokenRepository } from './modules/auth/repositories/m
 import { createMongoUserRepository } from './modules/auth/repositories/mongo-user.repository.js';
 import { createArgon2Hasher } from './modules/auth/utils/password-hasher.js';
 import type { ChunkDeleter } from './modules/chunks/interfaces/chunk-deleter.js';
+import type { ChunkReader } from './modules/chunks/interfaces/chunk-reader.js';
 import type { ChunkSearcher } from './modules/chunks/interfaces/chunk-searcher.js';
 import { createMongoChunkDeleter } from './modules/chunks/repositories/mongo-chunk-deleter.js';
+import { createMongoChunkReader } from './modules/chunks/repositories/mongo-chunk-reader.js';
 import { createMongoChunkSearcher } from './modules/chunks/repositories/mongo-chunk-searcher.js';
 import type { ConversationRepository } from './modules/conversations/interfaces/conversation.repository.js';
 import { createMongoConversationRepository } from './modules/conversations/repositories/mongo-conversation.repository.js';
@@ -36,6 +38,7 @@ export interface AppDependencies {
   objectStorage: ObjectStorage;
   ingestionQueue: IngestionQueue;
   chunkDeleter: ChunkDeleter;
+  chunkReader: ChunkReader;
   chunkSearcher: ChunkSearcher;
   embeddingsProvider: EmbeddingsProvider;
   hasher: PasswordHasher;
@@ -60,6 +63,7 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
     objectStorage: createMinioObjectStorage(minioClient, config.MINIO_BUCKET),
     ingestionQueue: createBullmqIngestionQueue(bullmqQueue),
     chunkDeleter: createMongoChunkDeleter(db),
+    chunkReader: createMongoChunkReader(db),
     chunkSearcher: createMongoChunkSearcher(db),
     embeddingsProvider: createVoyageEmbeddingsProvider({
       apiKey: config.VOYAGE_API_KEY,

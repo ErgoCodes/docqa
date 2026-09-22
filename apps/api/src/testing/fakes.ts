@@ -6,6 +6,7 @@ import type { RefreshToken, RevokedReason } from '../modules/auth/types/refresh-
 import { DuplicateEmailError, type User } from '../modules/auth/types/user.js';
 import { createArgon2Hasher } from '../modules/auth/utils/password-hasher.js';
 import type { ChunkDeleter } from '../modules/chunks/interfaces/chunk-deleter.js';
+import type { ChunkReader } from '../modules/chunks/interfaces/chunk-reader.js';
 import type { ChunkSearcher } from '../modules/chunks/interfaces/chunk-searcher.js';
 import type { Chunk, ChunkSearchResult } from '../modules/chunks/types/chunk.js';
 import type { ConversationRepository } from '../modules/conversations/interfaces/conversation.repository.js';
@@ -171,6 +172,15 @@ export function createInMemoryChunkDeleter(chunks: Chunk[] = []): ChunkDeleter {
   };
 }
 
+export function createInMemoryChunkReader(chunks: Chunk[] = []): ChunkReader {
+  return {
+    findById: (id: string, userId: string): Promise<Chunk | null> => {
+      const chunk = chunks.find((item) => item.id === id && item.userId === userId);
+      return Promise.resolve(chunk ?? null);
+    },
+  };
+}
+
 export function createInMemoryIngestionQueue(): IngestionQueue {
   const enqueued: string[] = [];
 
@@ -191,6 +201,7 @@ export function createInMemoryDependencies(): AppDependencies {
     objectStorage: createInMemoryObjectStorage(),
     ingestionQueue: createInMemoryIngestionQueue(),
     chunkDeleter: createInMemoryChunkDeleter(),
+    chunkReader: createInMemoryChunkReader(),
     chunkSearcher: createInMemoryChunkSearcher(),
     embeddingsProvider: createInMemoryEmbeddingsProvider(),
     // Argon2 real con memoryCost mínimo, no un mock: cubre el camino
