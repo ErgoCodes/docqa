@@ -36,5 +36,47 @@ export function createMongoConversationRepository(db: Db): ConversationRepositor
       await collection.insertOne(doc);
       return toDomain(doc);
     },
+
+    findById: async (id: string, userId: string): Promise<Conversation | null> => {
+      if (!ObjectId.isValid(id) || !ObjectId.isValid(userId)) {
+        return null;
+      }
+
+      const doc = await collection.findOne({
+        _id: new ObjectId(id),
+        userId: new ObjectId(userId),
+      });
+
+      return doc ? toDomain(doc) : null;
+    },
+
+    appendMessages: async (
+      id: string,
+      userId: string,
+      messages: Message[],
+    ): Promise<Conversation | null> => {
+      if (!ObjectId.isValid(id) || !ObjectId.isValid(userId)) {
+        return null;
+      }
+
+      const doc = await collection.findOneAndUpdate(
+        {
+          _id: new ObjectId(id),
+          userId: new ObjectId(userId),
+        },
+        {
+          $push: {
+            messages: {
+              $each: messages,
+            },
+          },
+        },
+        {
+          returnDocument: 'after',
+        },
+      );
+
+      return doc ? toDomain(doc) : null;
+    },
   };
 }
