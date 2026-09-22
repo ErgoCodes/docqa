@@ -14,6 +14,8 @@ describe('connectMinio', () => {
       MINIO_ROOT_PASSWORD: 'miniopassword',
       MINIO_BUCKET: 'test-bucket',
       WORKER_CONCURRENCY: 2,
+      VOYAGE_API_KEY: 'test-voyage-api-key',
+      EMBEDDINGS_MODEL: 'voyage-3-lite',
     });
 
     expect(client).toBeDefined();

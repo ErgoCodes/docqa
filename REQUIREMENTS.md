@@ -112,7 +112,7 @@ Al preguntar, la API revisa la caché, genera el embedding de la pregunta, busca
 | Frontend | React 19, Vite, TanStack Query y Router, Tailwind | Stack principal |
 | API | Node.js, Fastify, TypeScript, Zod | Stack principal y validación |
 | Cola y worker | BullMQ sobre Redis | Procesamiento asíncrono |
-| Embeddings | API de embeddings (por ejemplo Voyage AI u OpenAI) | Embeddings y vectorización |
+| Embeddings | Voyage AI (`voyage-3-lite`, 512 dimensiones) | Embeddings y vectorización |
 | Base de datos | MongoDB Atlas con Vector Search | MongoDB y búsqueda semántica |
 | Caché y límites | Redis | Caché y rate limiting |
 | Archivos | MinIO (compatible con S3) | Almacenamiento de objetos |
@@ -187,7 +187,7 @@ Si la fase 4 se alarga, se puede publicar el repositorio sin despliegue: el READ
 
 Decidido: los embeddings se generan con una API desde el inicio. Los riesgos principales pasan a ser el costo de las APIs y la dependencia de un proveedor.
 
-- **Embeddings locales o por API.** Decidido: API de embeddings desde el inicio, así la demo pública funciona sin cambios. El modelo se elige en la fase 2 y se guarda en la configuración. Cambiar de modelo cambia las dimensiones del índice y obliga a regenerar los vectores.
+- **Embeddings locales o por API.** Decidido: API de embeddings desde el inicio, así la demo pública funciona sin cambios. Proveedor elegido en la fase 2: Voyage AI, modelo `voyage-3-lite` (512 dimensiones). Motivos: Voyage es el proveedor de embeddings recomendado por Anthropic, lo que da una integración coherente con el resto del stack (la generación ya usa la API de Claude); su tier gratuito es amplio, lo que permite que la demo pública funcione sin pedirle tarjeta de crédito a quien la pruebe; y 512 dimensiones pesan menos en el índice vectorial que las 1536 por defecto de OpenAI, lo que ayuda a mantenerse dentro de los límites de almacenamiento del tier gratuito de MongoDB Atlas (ver el riesgo siguiente). El modelo se guarda en la variable de entorno `EMBEDDINGS_MODEL`. Cambiar de modelo cambia las dimensiones del índice y obliga a regenerar los vectores.
 - **Límites de MongoDB Atlas gratuito.** La capa gratuita tiene límites de almacenamiento e índices. Hay que confirmar al inicio que el índice vectorial funciona ahí, o usar un despliegue local con Atlas CLI. pgvector sería más simple, pero no cubriría la brecha de MongoDB del CV.
 - **Costo de las APIs (LLM y embeddings).** Usar un modelo pequeño, fijar un límite de gasto en la cuenta y apoyarse en la caché de Redis.
 - **Inyección de prompts desde los documentos.** Se mitiga con RNF-05 y porque el sistema no ejecuta acciones: solo responde texto.

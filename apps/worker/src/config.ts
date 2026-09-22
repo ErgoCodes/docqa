@@ -11,6 +11,8 @@ const configSchema = z.object({
   MINIO_ROOT_PASSWORD: z.string().min(1),
   MINIO_BUCKET: z.string().min(1),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  VOYAGE_API_KEY: z.string().min(1),
+  EMBEDDINGS_MODEL: z.string().min(1).default('voyage-3-lite'),
 });
 
 export type WorkerConfig = z.infer<typeof configSchema>;

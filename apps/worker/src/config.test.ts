@@ -10,6 +10,8 @@ const validEnv = {
   MINIO_ROOT_USER: 'minioadmin',
   MINIO_ROOT_PASSWORD: 'changeme-local-only',
   MINIO_BUCKET: 'docqa-documents',
+  VOYAGE_API_KEY: 'test-voyage-api-key',
+  EMBEDDINGS_MODEL: 'voyage-3-lite',
 };
 
 describe('loadConfig', () => {
@@ -20,6 +22,17 @@ describe('loadConfig', () => {
     expect(config.WORKER_CONCURRENCY).toBe(2);
     expect(config.MINIO_USE_SSL).toBe(false);
     expect(config.MINIO_PORT).toBe(9000);
+    expect(config.VOYAGE_API_KEY).toBe('test-voyage-api-key');
+    expect(config.EMBEDDINGS_MODEL).toBe('voyage-3-lite');
+  });
+
+  it('applies default EMBEDDINGS_MODEL when omitted', () => {
+    const envWithoutModel: Record<string, string> = { ...validEnv };
+    delete envWithoutModel.EMBEDDINGS_MODEL;
+
+    const config = loadConfig(envWithoutModel);
+
+    expect(config.EMBEDDINGS_MODEL).toBe('voyage-3-lite');
   });
 
   it('correctly transforms MINIO_USE_SSL string to boolean', () => {
@@ -39,7 +52,25 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...validEnv, REDIS_URL: 'http://localhost:6379' })).toThrow(/Invalid configuration/);
   });
 
+  it('throws when VOYAGE_API_KEY is missing', () => {
+    const envWithoutApiKey: Record<string, string> = { ...validEnv };
+    delete envWithoutApiKey.VOYAGE_API_KEY;
+
+    expect(() => loadConfig(envWithoutApiKey)).toThrow(/VOYAGE_API_KEY/);
+  });
+
   it('throws with an informative message listing missing fields', () => {
     expect(() => loadConfig({})).toThrow(/Invalid configuration/);
+  });
+
+  it('never includes received secret value in error message', () => {
+    const secretValue = 'super-secret-raw-value';
+
+    expect.assertions(1);
+    try {
+      loadConfig({ ...validEnv, MONGODB_URI: secretValue });
+    } catch (error) {
+      expect(String(error)).not.toContain(secretValue);
+    }
   });
 });
