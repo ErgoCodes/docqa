@@ -5,6 +5,8 @@ import type { NewUser, UserRepository } from '../modules/auth/interfaces/user.re
 import type { RefreshToken, RevokedReason } from '../modules/auth/types/refresh-token.js';
 import { DuplicateEmailError, type User } from '../modules/auth/types/user.js';
 import { createArgon2Hasher } from '../modules/auth/utils/password-hasher.js';
+import type { ConversationRepository } from '../modules/conversations/interfaces/conversation.repository.js';
+import type { Conversation, NewConversation } from '../modules/conversations/types/conversation.js';
 import type { DocumentRepository } from '../modules/documents/interfaces/document.repository.js';
 import type { IngestionQueue } from '../modules/documents/interfaces/ingestion-queue.js';
 import type { ObjectStorage } from '../modules/documents/interfaces/object-storage.js';
@@ -101,6 +103,21 @@ export function createInMemoryDocumentRepository(): DocumentRepository {
   };
 }
 
+export function createInMemoryConversationRepository(): ConversationRepository {
+  const conversations = new Map<string, Conversation>();
+
+  return {
+    insert: (conversation: NewConversation): Promise<Conversation> => {
+      const stored: Conversation = {
+        id: randomUUID(),
+        ...conversation,
+      };
+      conversations.set(stored.id, stored);
+      return Promise.resolve(stored);
+    },
+  };
+}
+
 export function createInMemoryObjectStorage(): ObjectStorage {
   const storage = new Map<string, { data: Buffer; contentType: string }>();
 
@@ -128,6 +145,7 @@ export function createInMemoryDependencies(): AppDependencies {
     users: createInMemoryUserRepository(),
     refreshTokens: createInMemoryRefreshTokenRepository(),
     documents: createInMemoryDocumentRepository(),
+    conversations: createInMemoryConversationRepository(),
     objectStorage: createInMemoryObjectStorage(),
     ingestionQueue: createInMemoryIngestionQueue(),
     // Argon2 real con memoryCost mínimo, no un mock: cubre el camino

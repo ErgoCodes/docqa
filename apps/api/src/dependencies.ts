@@ -10,6 +10,8 @@ import type { UserRepository } from './modules/auth/interfaces/user.repository.j
 import { createMongoRefreshTokenRepository } from './modules/auth/repositories/mongo-refresh-token.repository.js';
 import { createMongoUserRepository } from './modules/auth/repositories/mongo-user.repository.js';
 import { createArgon2Hasher } from './modules/auth/utils/password-hasher.js';
+import type { ConversationRepository } from './modules/conversations/interfaces/conversation.repository.js';
+import { createMongoConversationRepository } from './modules/conversations/repositories/mongo-conversation.repository.js';
 import type { DocumentRepository } from './modules/documents/interfaces/document.repository.js';
 import type { IngestionQueue } from './modules/documents/interfaces/ingestion-queue.js';
 import type { ObjectStorage } from './modules/documents/interfaces/object-storage.js';
@@ -24,6 +26,7 @@ export interface AppDependencies {
   users: UserRepository;
   refreshTokens: RefreshTokenRepository;
   documents: DocumentRepository;
+  conversations: ConversationRepository;
   objectStorage: ObjectStorage;
   ingestionQueue: IngestionQueue;
   hasher: PasswordHasher;
@@ -44,6 +47,7 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
     users: createMongoUserRepository(db),
     refreshTokens: createMongoRefreshTokenRepository(db),
     documents: createMongoDocumentRepository(db),
+    conversations: createMongoConversationRepository(db),
     objectStorage: createMinioObjectStorage(minioClient, config.MINIO_BUCKET),
     ingestionQueue: createBullmqIngestionQueue(bullmqQueue),
     hasher: createArgon2Hasher({
