@@ -17,4 +17,6 @@ export async function ensureIndexes(db: Db): Promise<void> {
   // que la validez de un token siempre se comprueba en código comparando
   // expiresAt, nunca confiando en que el documento ya se haya borrado.
   await refreshTokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+  await db.collection('documents').createIndex({ userId: 1, createdAt: -1 });
 }

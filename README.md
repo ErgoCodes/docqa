@@ -48,6 +48,24 @@ GIF y uso de IA es una tarea propia del tablero.
   este tamaño de proyecto es suficiente; en producción sería una migración
   versionada.
 
+**Documentos (RF-02, RF-04)**
+
+- Validación estructural real: no se confía en el `Content-Type` enviado por el
+  cliente ni en la extensión del archivo. Se comprueban los magic bytes (`%PDF-`)
+  para fallo rápido y se carga la estructura completa con `pdf-lib` (descartando
+  archivos corruptos o cifrados) antes de persistir o encolar.
+- Aislamiento directo en base de datos (RNF-01): `findById` y las consultas de
+  documentos filtran por `_id` y `userId` en el mismo predicado de MongoDB,
+  garantizando que ninguna consulta devuelva datos de otro usuario y retornando 404
+  (sin delatar si el ID existe en otra cuenta).
+- Claves de almacenamiento aleatorias (`${userId}/${uuid}.pdf`): el nombre en MinIO
+  se desacopla del título del archivo original para evitar colisiones y vectores de
+  path traversal.
+- Orden de persistencia sin compensación: se almacena el blob en MinIO antes de
+  insertar el registro en MongoDB; si falla la inserción en base de datos o el
+  encolado, queda un blob huérfano inofensivo en MinIO, evitando registros
+  rotos en la base de datos sin sobre-ingeniería de rollback.
+
 **CI (RNF-12)**
 
 - Dos jobs en paralelo: `checks` (lint, tipos, tests unitarios y cobertura de

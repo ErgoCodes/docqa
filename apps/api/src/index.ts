@@ -1,9 +1,9 @@
 import { loadConfig } from './config.js';
-import { createMongoDependencies } from './dependencies.js';
+import { createAppDependencies } from './dependencies.js';
 import { buildServer } from './server.js';
 
 const config = loadConfig();
-const dependencies = await createMongoDependencies(config);
+const dependencies = await createAppDependencies(config);
 const app = await buildServer({ config, dependencies });
 
 async function shutdown(signal: string): Promise<void> {

@@ -1,11 +1,14 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { AppConfig } from './config.js';
 import type { AppDependencies } from './dependencies.js';
-import { registerHealthRoutes } from './modules/health/routes/health.routes.js';
 import { registerAuthRoutes } from './modules/auth/routes/auth.routes.js';
 import { createAuthService } from './modules/auth/services/auth.service.js';
+import { registerDocumentRoutes } from './modules/documents/routes/document.routes.js';
+import { createDocumentService } from './modules/documents/services/document.service.js';
+import { registerHealthRoutes } from './modules/health/routes/health.routes.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
+import { registerMultipart } from './plugins/multipart.js';
 import { createLoggerOptions, registerSecurity } from './plugins/security.js';
 
 export interface BuildServerOptions {
@@ -20,6 +23,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
 
   registerErrorHandler(app);
   await registerSecurity(app, config);
+  await registerMultipart(app);
   await registerAuth(app, config);
 
   const authService = createAuthService({
@@ -32,8 +36,15 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
     refreshFamilyMaxDays: config.REFRESH_FAMILY_MAX_DAYS,
   });
 
+  const documentService = createDocumentService({
+    documents: dependencies.documents,
+    objectStorage: dependencies.objectStorage,
+    ingestionQueue: dependencies.ingestionQueue,
+  });
+
   await app.register(registerHealthRoutes);
   await app.register(registerAuthRoutes, { service: authService });
+  await app.register(registerDocumentRoutes, { service: documentService });
 
   return app;
 }

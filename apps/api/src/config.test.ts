@@ -4,6 +4,13 @@ import { loadConfig } from './config.js';
 const validEnv = {
   CORS_ORIGIN: 'http://localhost:5173',
   MONGODB_URI: 'mongodb://localhost:27017/docqa',
+  REDIS_URL: 'redis://localhost:6379',
+  MINIO_ENDPOINT: 'localhost',
+  MINIO_PORT: '9000',
+  MINIO_USE_SSL: 'false',
+  MINIO_ROOT_USER: 'minioadmin',
+  MINIO_ROOT_PASSWORD: 'changeme-local-only',
+  MINIO_BUCKET: 'docqa-documents',
   JWT_SECRET: 'x'.repeat(32),
 };
 
@@ -42,5 +49,17 @@ describe('loadConfig', () => {
 
   it('rechaza un CORS_ORIGIN que no sea una URL', () => {
     expect(() => loadConfig({ ...validEnv, CORS_ORIGIN: 'no-es-una-url' })).toThrow();
+  });
+
+  it('transforma MINIO_USE_SSL a booleano correctamente', () => {
+    const configFalse = loadConfig({ ...validEnv, MINIO_USE_SSL: 'false' });
+    expect(configFalse.MINIO_USE_SSL).toBe(false);
+
+    const configTrue = loadConfig({ ...validEnv, MINIO_USE_SSL: 'true' });
+    expect(configTrue.MINIO_USE_SSL).toBe(true);
+  });
+
+  it('rechaza un REDIS_URL que no empiece por redis', () => {
+    expect(() => loadConfig({ ...validEnv, REDIS_URL: 'http://localhost:6379' })).toThrow();
   });
 });

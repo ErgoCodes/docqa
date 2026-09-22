@@ -40,6 +40,14 @@ describe('mapErrorToResponse', () => {
     expect(result.body.error.details?.[0]).toMatchObject({ path: 'email' });
   });
 
+  it('mapea un error FST_REQ_FILE_TOO_LARGE a 413 FILE_TOO_LARGE', () => {
+    const multipartError = { code: 'FST_REQ_FILE_TOO_LARGE', message: 'request file too large' };
+    const result = mapErrorToResponse(multipartError, 'req-5');
+
+    expect(result.statusCode).toBe(413);
+    expect(result.body.error.code).toBe('FILE_TOO_LARGE');
+  });
+
   it('mapea cualquier otro error a 500 sin filtrar su mensaje original', () => {
     const result = mapErrorToResponse(new Error('detalle interno sensible'), 'req-4');
 
