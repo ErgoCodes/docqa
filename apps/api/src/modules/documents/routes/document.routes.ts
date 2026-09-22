@@ -77,5 +77,12 @@ export const registerDocumentRoutes: FastifyPluginAsync<DocumentRoutesOptions> =
     return documentResponseSchema.parse(document);
   });
 
+  app.delete('/documents/:id', { preHandler: app.authenticate }, async (request, reply) => {
+    const params = documentIdParamsSchema.parse(request.params);
+    await service.remove(params.id, request.user.sub);
+    void reply.status(204);
+    return reply.send();
+  });
+
   return Promise.resolve();
 };

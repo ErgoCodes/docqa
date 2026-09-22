@@ -1,4 +1,5 @@
 import { AppError } from '../../../errors.js';
+import type { ChunkDeleter } from '../../chunks/interfaces/chunk-deleter.js';
 import type { DocumentRepository } from '../interfaces/document.repository.js';
 import type { IngestionQueue } from '../interfaces/ingestion-queue.js';
 import type { ObjectStorage } from '../interfaces/object-storage.js';
@@ -11,6 +12,7 @@ export interface DocumentServiceDependencies {
   documents: DocumentRepository;
   objectStorage: ObjectStorage;
   ingestionQueue: IngestionQueue;
+  chunkDeleter: ChunkDeleter;
   now?: () => Date;
 }
 
@@ -24,10 +26,11 @@ export interface DocumentService {
   upload: (input: UploadDocumentInput) => Promise<Document>;
   list: (userId: string) => Promise<Document[]>;
   getById: (id: string, userId: string) => Promise<Document>;
+  remove: (id: string, userId: string) => Promise<void>;
 }
 
 export function createDocumentService(deps: DocumentServiceDependencies): DocumentService {
-  const { documents, objectStorage, ingestionQueue } = deps;
+  const { documents, objectStorage, ingestionQueue, chunkDeleter } = deps;
   const now = deps.now ?? ((): Date => new Date());
 
   return {
@@ -82,6 +85,23 @@ export function createDocumentService(deps: DocumentServiceDependencies): Docume
       }
 
       return doc;
+    },
+
+    remove: async (id: string, userId: string): Promise<void> => {
+      const doc = await documents.findById(id, userId);
+
+      if (!doc) {
+        throw new AppError(DocumentErrors.DOCUMENT_NOT_FOUND);
+      }
+
+      // The document row is deleted last on purpose: chunk deletion and
+      // object storage deletion are both idempotent, so if either fails the
+      // row survives and the same DELETE request can simply be retried. If
+      // the row were deleted first, a later failure would leave orphaned
+      // chunks/file with no way to retry through the API.
+      await chunkDeleter.deleteByDocumentId(id, userId);
+      await objectStorage.deleteObject(doc.storageKey);
+      await documents.deleteById(id, userId);
     },
   };
 }

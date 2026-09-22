@@ -98,6 +98,36 @@ function describeDocumentRepositoryContract(name: string, createRepository: () =
       const randomUser = new ObjectId().toHexString();
       expect(await repository.findAllByUser(randomUser)).toEqual([]);
     });
+
+    it('deleteById borra el documento propio y devuelve true', async () => {
+      const userId = new ObjectId().toHexString();
+      const doc = await repository.insert(newDocumentInput({ userId, title: 'a-borrar' }));
+
+      const deleted = await repository.deleteById(doc.id, userId);
+      expect(deleted).toBe(true);
+
+      expect(await repository.findById(doc.id, userId)).toBeNull();
+    });
+
+    it('deleteById devuelve false para un id que no existe', async () => {
+      const userId = new ObjectId().toHexString();
+      const nonExistentId = new ObjectId().toHexString();
+
+      expect(await repository.deleteById(nonExistentId, userId)).toBe(false);
+    });
+
+    it('RNF-01: deleteById devuelve false si el documento pertenece a otro usuario y lo deja intacto', async () => {
+      const userA = new ObjectId().toHexString();
+      const userB = new ObjectId().toHexString();
+
+      const docUserA = await repository.insert(newDocumentInput({ userId: userA, title: 'privado-a-borrado' }));
+
+      const deletedByUserB = await repository.deleteById(docUserA.id, userB);
+      expect(deletedByUserB).toBe(false);
+
+      const stillThere = await repository.findById(docUserA.id, userA);
+      expect(stillThere).toEqual(docUserA);
+    });
   });
 }
 
