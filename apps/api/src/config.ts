@@ -23,6 +23,8 @@ const configSchema = z.object({
   ARGON2_MEMORY_COST: z.coerce.number().int().min(8).default(19456),
   ARGON2_TIME_COST: z.coerce.number().int().min(1).default(2),
   ARGON2_PARALLELISM: z.coerce.number().int().min(1).default(1),
+  VOYAGE_API_KEY: z.string().min(1),
+  EMBEDDINGS_MODEL: z.string().min(1).default('voyage-3-lite'),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

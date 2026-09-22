@@ -12,6 +12,7 @@ const validEnv = {
   MINIO_ROOT_PASSWORD: 'changeme-local-only',
   MINIO_BUCKET: 'docqa-documents',
   JWT_SECRET: 'x'.repeat(32),
+  VOYAGE_API_KEY: 'test-voyage-key',
 };
 
 describe('loadConfig', () => {
