@@ -42,6 +42,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
     documents: dependencies.documents,
     objectStorage: dependencies.objectStorage,
     ingestionQueue: dependencies.ingestionQueue,
+    chunkDeleter: dependencies.chunkDeleter,
   });
 
   const conversationService = createConversationService({

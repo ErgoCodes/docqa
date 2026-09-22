@@ -5,6 +5,8 @@ import type { NewUser, UserRepository } from '../modules/auth/interfaces/user.re
 import type { RefreshToken, RevokedReason } from '../modules/auth/types/refresh-token.js';
 import { DuplicateEmailError, type User } from '../modules/auth/types/user.js';
 import { createArgon2Hasher } from '../modules/auth/utils/password-hasher.js';
+import type { ChunkDeleter } from '../modules/chunks/interfaces/chunk-deleter.js';
+import type { Chunk } from '../modules/chunks/types/chunk.js';
 import type { ConversationRepository } from '../modules/conversations/interfaces/conversation.repository.js';
 import type { Conversation, NewConversation } from '../modules/conversations/types/conversation.js';
 import type { DocumentRepository } from '../modules/documents/interfaces/document.repository.js';
@@ -100,6 +102,15 @@ export function createInMemoryDocumentRepository(): DocumentRepository {
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       return Promise.resolve(userDocs);
     },
+
+    deleteById: (id: string, userId: string): Promise<boolean> => {
+      const doc = documents.get(id);
+      if (!doc || doc.userId !== userId) {
+        return Promise.resolve(false);
+      }
+      documents.delete(id);
+      return Promise.resolve(true);
+    },
   };
 }
 
@@ -126,6 +137,23 @@ export function createInMemoryObjectStorage(): ObjectStorage {
       storage.set(key, { data, contentType });
       return Promise.resolve();
     },
+
+    deleteObject: (key: string): Promise<void> => {
+      storage.delete(key);
+      return Promise.resolve();
+    },
+  };
+}
+
+export function createInMemoryChunkDeleter(chunks: Chunk[] = []): ChunkDeleter {
+  return {
+    deleteByDocumentId: (documentId: string, userId: string): Promise<number> => {
+      const remaining = chunks.filter((chunk) => !(chunk.documentId === documentId && chunk.userId === userId));
+      const deletedCount = chunks.length - remaining.length;
+      chunks.length = 0;
+      chunks.push(...remaining);
+      return Promise.resolve(deletedCount);
+    },
   };
 }
 
@@ -148,6 +176,7 @@ export function createInMemoryDependencies(): AppDependencies {
     conversations: createInMemoryConversationRepository(),
     objectStorage: createInMemoryObjectStorage(),
     ingestionQueue: createInMemoryIngestionQueue(),
+    chunkDeleter: createInMemoryChunkDeleter(),
     // Argon2 real con memoryCost mínimo, no un mock: cubre el camino
     // crítico sin pagar su coste en cada test (~1-5ms por hash).
     hasher: createArgon2Hasher({ memoryCost: 8, timeCost: 1, parallelism: 1 }),

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
+import type { ChunkDeleter } from '../../chunks/interfaces/chunk-deleter.js';
 import type { DocumentRepository } from '../interfaces/document.repository.js';
 import type { IngestionQueue } from '../interfaces/ingestion-queue.js';
 import type { ObjectStorage } from '../interfaces/object-storage.js';
@@ -38,11 +39,23 @@ function createMockDependencies() {
     findAllByUser: vi.fn((userId: string): Promise<Document[]> => {
       return Promise.resolve(Array.from(storedDocs.values()).filter((d) => d.userId === userId));
     }),
+    deleteById: vi.fn((id: string, userId: string): Promise<boolean> => {
+      const doc = storedDocs.get(id);
+      if (!doc || doc.userId !== userId) {
+        return Promise.resolve(false);
+      }
+      storedDocs.delete(id);
+      return Promise.resolve(true);
+    }),
   };
 
   const objectStorage: ObjectStorage = {
     putObject: vi.fn((key: string, data: Buffer, contentType: string): Promise<void> => {
       storedObjects.set(key, { data, contentType });
+      return Promise.resolve();
+    }),
+    deleteObject: vi.fn((key: string): Promise<void> => {
+      storedObjects.delete(key);
       return Promise.resolve();
     }),
   };
@@ -54,7 +67,24 @@ function createMockDependencies() {
     }),
   };
 
-  return { documents, objectStorage, ingestionQueue, storedDocs, storedObjects, enqueuedJobs };
+  const deletedChunksByDocument: string[] = [];
+  const chunkDeleter: ChunkDeleter = {
+    deleteByDocumentId: vi.fn((documentId: string): Promise<number> => {
+      deletedChunksByDocument.push(documentId);
+      return Promise.resolve(0);
+    }),
+  };
+
+  return {
+    documents,
+    objectStorage,
+    ingestionQueue,
+    chunkDeleter,
+    storedDocs,
+    storedObjects,
+    enqueuedJobs,
+    deletedChunksByDocument,
+  };
 }
 
 describe('DocumentService', () => {
@@ -187,6 +217,94 @@ describe('DocumentService', () => {
         code: 'DOCUMENT_NOT_FOUND',
         statusCode: 404,
       });
+    });
+  });
+
+  describe('remove', () => {
+    it('borra un documento propio: chunks, archivo y registro, en ese orden', async () => {
+      const deps = createMockDependencies();
+      const service = createDocumentService(deps);
+
+      const buf = await buildPdfBuffer(1);
+      const created = await service.upload({ userId: 'user-1', filename: 'a-borrar.pdf', buffer: buf });
+
+      await service.remove(created.id, 'user-1');
+
+      expect(deps.chunkDeleter.deleteByDocumentId).toHaveBeenCalledWith(created.id, 'user-1');
+      expect(deps.objectStorage.deleteObject).toHaveBeenCalledWith(created.storageKey);
+      expect(deps.documents.deleteById).toHaveBeenCalledWith(created.id, 'user-1');
+      expect(deps.storedDocs.has(created.id)).toBe(false);
+    });
+
+    it('lanza DOCUMENT_NOT_FOUND (404) si el documento no existe', async () => {
+      const deps = createMockDependencies();
+      const service = createDocumentService(deps);
+
+      await expect(service.remove('no-existe', 'user-1')).rejects.toMatchObject({
+        code: 'DOCUMENT_NOT_FOUND',
+        statusCode: 404,
+      });
+    });
+
+    it('RNF-01: lanza DOCUMENT_NOT_FOUND (404) si el documento es de otro usuario y no toca storage', async () => {
+      const deps = createMockDependencies();
+      const service = createDocumentService(deps);
+
+      const buf = await buildPdfBuffer(1);
+      const created = await service.upload({ userId: 'user-2', filename: 'doc-ajeno.pdf', buffer: buf });
+
+      await expect(service.remove(created.id, 'user-1')).rejects.toMatchObject({
+        code: 'DOCUMENT_NOT_FOUND',
+        statusCode: 404,
+      });
+
+      expect(deps.chunkDeleter.deleteByDocumentId).not.toHaveBeenCalled();
+      expect(deps.objectStorage.deleteObject).not.toHaveBeenCalled();
+      expect(deps.documents.deleteById).not.toHaveBeenCalled();
+      expect(deps.storedDocs.has(created.id)).toBe(true);
+    });
+
+    it('borra un documento que todavía no tiene chunks (chunkDeleter devuelve 0)', async () => {
+      const deps = createMockDependencies();
+      const service = createDocumentService(deps);
+
+      const buf = await buildPdfBuffer(1);
+      const created = await service.upload({ userId: 'user-1', filename: 'sin-chunks.pdf', buffer: buf });
+
+      await expect(service.remove(created.id, 'user-1')).resolves.toBeUndefined();
+      expect(deps.storedDocs.has(created.id)).toBe(false);
+    });
+
+    it('si objectStorage.deleteObject falla, remove() rechaza y no borra el registro del documento', async () => {
+      const deps = createMockDependencies();
+      const storageError = new Error('minio unavailable');
+      vi.mocked(deps.objectStorage.deleteObject).mockRejectedValueOnce(storageError);
+      const service = createDocumentService(deps);
+
+      const buf = await buildPdfBuffer(1);
+      const created = await service.upload({ userId: 'user-1', filename: 'falla-storage.pdf', buffer: buf });
+
+      await expect(service.remove(created.id, 'user-1')).rejects.toThrow(storageError);
+
+      expect(deps.chunkDeleter.deleteByDocumentId).toHaveBeenCalledWith(created.id, 'user-1');
+      expect(deps.documents.deleteById).not.toHaveBeenCalled();
+      expect(deps.storedDocs.has(created.id)).toBe(true);
+    });
+
+    it('si chunkDeleter.deleteByDocumentId falla, remove() rechaza y no toca storage ni el registro', async () => {
+      const deps = createMockDependencies();
+      const chunkError = new Error('mongo unavailable');
+      vi.mocked(deps.chunkDeleter.deleteByDocumentId).mockRejectedValueOnce(chunkError);
+      const service = createDocumentService(deps);
+
+      const buf = await buildPdfBuffer(1);
+      const created = await service.upload({ userId: 'user-1', filename: 'falla-chunks.pdf', buffer: buf });
+
+      await expect(service.remove(created.id, 'user-1')).rejects.toThrow(chunkError);
+
+      expect(deps.objectStorage.deleteObject).not.toHaveBeenCalled();
+      expect(deps.documents.deleteById).not.toHaveBeenCalled();
+      expect(deps.storedDocs.has(created.id)).toBe(true);
     });
   });
 });

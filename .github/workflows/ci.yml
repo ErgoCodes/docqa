@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       mongodb:
-        image: mongodb/mongodb-atlas-local:7.0.9
+        image: mongodb/mongodb-atlas-local:8.0.30
         ports:
           - 27017:27017
         options: >-

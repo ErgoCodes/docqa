@@ -10,6 +10,8 @@ import type { UserRepository } from './modules/auth/interfaces/user.repository.j
 import { createMongoRefreshTokenRepository } from './modules/auth/repositories/mongo-refresh-token.repository.js';
 import { createMongoUserRepository } from './modules/auth/repositories/mongo-user.repository.js';
 import { createArgon2Hasher } from './modules/auth/utils/password-hasher.js';
+import type { ChunkDeleter } from './modules/chunks/interfaces/chunk-deleter.js';
+import { createMongoChunkDeleter } from './modules/chunks/repositories/mongo-chunk-deleter.js';
 import type { ConversationRepository } from './modules/conversations/interfaces/conversation.repository.js';
 import { createMongoConversationRepository } from './modules/conversations/repositories/mongo-conversation.repository.js';
 import type { DocumentRepository } from './modules/documents/interfaces/document.repository.js';
@@ -29,6 +31,7 @@ export interface AppDependencies {
   conversations: ConversationRepository;
   objectStorage: ObjectStorage;
   ingestionQueue: IngestionQueue;
+  chunkDeleter: ChunkDeleter;
   hasher: PasswordHasher;
   close: () => Promise<void>;
 }
@@ -50,6 +53,7 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
     conversations: createMongoConversationRepository(db),
     objectStorage: createMinioObjectStorage(minioClient, config.MINIO_BUCKET),
     ingestionQueue: createBullmqIngestionQueue(bullmqQueue),
+    chunkDeleter: createMongoChunkDeleter(db),
     hasher: createArgon2Hasher({
       memoryCost: config.ARGON2_MEMORY_COST,
       timeCost: config.ARGON2_TIME_COST,

@@ -73,5 +73,18 @@ export function createMongoDocumentRepository(db: Db): DocumentRepository {
 
       return docs.map(toDomain);
     },
+
+    deleteById: async (id: string, userId: string): Promise<boolean> => {
+      if (!ObjectId.isValid(id) || !ObjectId.isValid(userId)) {
+        return false;
+      }
+
+      const result = await collection.deleteOne({
+        _id: new ObjectId(id),
+        userId: new ObjectId(userId),
+      });
+
+      return result.deletedCount === 1;
+    },
   };
 }

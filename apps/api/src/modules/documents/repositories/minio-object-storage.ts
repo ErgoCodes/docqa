@@ -8,5 +8,11 @@ export function createMinioObjectStorage(client: Client, bucket: string): Object
         'Content-Type': contentType,
       });
     },
+
+    // MinIO does not throw when removing a key that no longer exists, which
+    // makes retrying a failed document deletion safe.
+    deleteObject: async (key: string): Promise<void> => {
+      await client.removeObject(bucket, key);
+    },
   };
 }
