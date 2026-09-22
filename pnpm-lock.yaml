@@ -249,6 +249,12 @@ importers:
       ioredis:
         specifier: ^5.4.2
         version: 5.11.1(supports-color@7.2.0)
+      mongodb:
+        specifier: ^6.21.0
+        version: 6.21.0
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
 
 packages:
 

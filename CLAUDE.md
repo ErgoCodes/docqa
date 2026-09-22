@@ -16,7 +16,7 @@ requisitos se convierte en semanas de trabajo en la dirección equivocada.
 - **Frontend**: React 19, Vite, TanStack Query y Router, Tailwind.
 - **API**: Node.js, Fastify, TypeScript estricto, Zod.
 - **Cola y worker**: BullMQ sobre Redis.
-- **Embeddings**: API de embeddings (Voyage AI u OpenAI, a decidir en fase 2).
+- **Embeddings**: Voyage AI (`voyage-3-lite`, 512 dimensiones).
 - **Base de datos**: MongoDB Atlas con Vector Search.
 - **Caché y límites**: Redis.
 - **Archivos**: MinIO (compatible con S3).

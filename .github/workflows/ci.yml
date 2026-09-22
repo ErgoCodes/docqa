@@ -70,7 +70,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Integration tests
+      - name: Integration tests (API)
         run: pnpm --filter @docqa/api test:integration
+        env:
+          MONGODB_TEST_URI: mongodb://localhost:27017/?directConnection=true
+
+      - name: Integration tests (worker)
+        run: pnpm --filter @docqa/worker test:integration
         env:
           MONGODB_TEST_URI: mongodb://localhost:27017/?directConnection=true
