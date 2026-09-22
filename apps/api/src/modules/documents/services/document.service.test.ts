@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
+import type { ResponseCache } from '../../cache/interfaces/response-cache.js';
 import type { ChunkDeleter } from '../../chunks/interfaces/chunk-deleter.js';
 import type { DocumentRepository } from '../interfaces/document.repository.js';
 import type { IngestionQueue } from '../interfaces/ingestion-queue.js';
@@ -75,11 +76,19 @@ function createMockDependencies() {
     }),
   };
 
+  const responseCache: ResponseCache = {
+    get: vi.fn((): Promise<null> => Promise.resolve(null)),
+    set: vi.fn((): Promise<void> => Promise.resolve()),
+    getUserGeneration: vi.fn((): Promise<number> => Promise.resolve(0)),
+    invalidateUser: vi.fn((): Promise<void> => Promise.resolve()),
+  };
+
   return {
     documents,
     objectStorage,
     ingestionQueue,
     chunkDeleter,
+    responseCache,
     storedDocs,
     storedObjects,
     enqueuedJobs,
@@ -89,7 +98,7 @@ function createMockDependencies() {
 
 describe('DocumentService', () => {
   describe('upload', () => {
-    it('sube un PDF válido, lo guarda en storage, lo inserta en la BD y lo encola', async () => {
+    it('sube un PDF válido, lo guarda en storage, lo inserta en la BD, lo encola e invalida la caché del usuario', async () => {
       const deps = createMockDependencies();
       const fixedDate = new Date('2026-09-20T12:00:00Z');
       const service = createDocumentService({ ...deps, now: () => fixedDate });
@@ -118,6 +127,7 @@ describe('DocumentService', () => {
       expect(deps.documents.insert).toHaveBeenCalledTimes(1);
       expect(deps.ingestionQueue.enqueue).toHaveBeenCalledWith('doc-1');
       expect(deps.enqueuedJobs).toContain('doc-1');
+      expect(deps.responseCache.invalidateUser).toHaveBeenCalledWith('user-1');
     });
 
     it('rechaza un archivo que supera MAX_UPLOAD_BYTES sin llegar a parsearlo', async () => {
@@ -135,6 +145,7 @@ describe('DocumentService', () => {
       expect(deps.objectStorage.putObject).not.toHaveBeenCalled();
       expect(deps.documents.insert).not.toHaveBeenCalled();
       expect(deps.ingestionQueue.enqueue).not.toHaveBeenCalled();
+      expect(deps.responseCache.invalidateUser).not.toHaveBeenCalled();
     });
 
     it('rechaza un archivo que no es un PDF válido', async () => {
@@ -148,6 +159,7 @@ describe('DocumentService', () => {
       ).rejects.toMatchObject({ code: 'INVALID_FILE_TYPE', statusCode: 415 });
 
       expect(deps.objectStorage.putObject).not.toHaveBeenCalled();
+      expect(deps.responseCache.invalidateUser).not.toHaveBeenCalled();
     });
 
     it('rechaza un PDF con más de 50 páginas', async () => {
@@ -161,6 +173,7 @@ describe('DocumentService', () => {
       ).rejects.toMatchObject({ code: 'TOO_MANY_PAGES', statusCode: 422 });
 
       expect(deps.objectStorage.putObject).not.toHaveBeenCalled();
+      expect(deps.responseCache.invalidateUser).not.toHaveBeenCalled();
     });
   });
 
@@ -221,18 +234,20 @@ describe('DocumentService', () => {
   });
 
   describe('remove', () => {
-    it('borra un documento propio: chunks, archivo y registro, en ese orden', async () => {
+    it('borra un documento propio: chunks, archivo, registro e invalida la caché del usuario, en ese orden', async () => {
       const deps = createMockDependencies();
       const service = createDocumentService(deps);
 
       const buf = await buildPdfBuffer(1);
       const created = await service.upload({ userId: 'user-1', filename: 'a-borrar.pdf', buffer: buf });
+      vi.clearAllMocks();
 
       await service.remove(created.id, 'user-1');
 
       expect(deps.chunkDeleter.deleteByDocumentId).toHaveBeenCalledWith(created.id, 'user-1');
       expect(deps.objectStorage.deleteObject).toHaveBeenCalledWith(created.storageKey);
       expect(deps.documents.deleteById).toHaveBeenCalledWith(created.id, 'user-1');
+      expect(deps.responseCache.invalidateUser).toHaveBeenCalledWith('user-1');
       expect(deps.storedDocs.has(created.id)).toBe(false);
     });
 
@@ -244,6 +259,7 @@ describe('DocumentService', () => {
         code: 'DOCUMENT_NOT_FOUND',
         statusCode: 404,
       });
+      expect(deps.responseCache.invalidateUser).not.toHaveBeenCalled();
     });
 
     it('RNF-01: lanza DOCUMENT_NOT_FOUND (404) si el documento es de otro usuario y no toca storage', async () => {
@@ -252,6 +268,7 @@ describe('DocumentService', () => {
 
       const buf = await buildPdfBuffer(1);
       const created = await service.upload({ userId: 'user-2', filename: 'doc-ajeno.pdf', buffer: buf });
+      vi.clearAllMocks();
 
       await expect(service.remove(created.id, 'user-1')).rejects.toMatchObject({
         code: 'DOCUMENT_NOT_FOUND',
@@ -261,6 +278,7 @@ describe('DocumentService', () => {
       expect(deps.chunkDeleter.deleteByDocumentId).not.toHaveBeenCalled();
       expect(deps.objectStorage.deleteObject).not.toHaveBeenCalled();
       expect(deps.documents.deleteById).not.toHaveBeenCalled();
+      expect(deps.responseCache.invalidateUser).not.toHaveBeenCalled();
       expect(deps.storedDocs.has(created.id)).toBe(true);
     });
 
@@ -270,12 +288,14 @@ describe('DocumentService', () => {
 
       const buf = await buildPdfBuffer(1);
       const created = await service.upload({ userId: 'user-1', filename: 'sin-chunks.pdf', buffer: buf });
+      vi.clearAllMocks();
 
       await expect(service.remove(created.id, 'user-1')).resolves.toBeUndefined();
+      expect(deps.responseCache.invalidateUser).toHaveBeenCalledWith('user-1');
       expect(deps.storedDocs.has(created.id)).toBe(false);
     });
 
-    it('si objectStorage.deleteObject falla, remove() rechaza y no borra el registro del documento', async () => {
+    it('si objectStorage.deleteObject falla, remove() rechaza y no borra el registro del documento ni invalida caché', async () => {
       const deps = createMockDependencies();
       const storageError = new Error('minio unavailable');
       vi.mocked(deps.objectStorage.deleteObject).mockRejectedValueOnce(storageError);
@@ -283,15 +303,17 @@ describe('DocumentService', () => {
 
       const buf = await buildPdfBuffer(1);
       const created = await service.upload({ userId: 'user-1', filename: 'falla-storage.pdf', buffer: buf });
+      vi.clearAllMocks();
 
       await expect(service.remove(created.id, 'user-1')).rejects.toThrow(storageError);
 
       expect(deps.chunkDeleter.deleteByDocumentId).toHaveBeenCalledWith(created.id, 'user-1');
       expect(deps.documents.deleteById).not.toHaveBeenCalled();
+      expect(deps.responseCache.invalidateUser).not.toHaveBeenCalled();
       expect(deps.storedDocs.has(created.id)).toBe(true);
     });
 
-    it('si chunkDeleter.deleteByDocumentId falla, remove() rechaza y no toca storage ni el registro', async () => {
+    it('si chunkDeleter.deleteByDocumentId falla, remove() rechaza y no toca storage, registro ni caché', async () => {
       const deps = createMockDependencies();
       const chunkError = new Error('mongo unavailable');
       vi.mocked(deps.chunkDeleter.deleteByDocumentId).mockRejectedValueOnce(chunkError);
@@ -299,11 +321,13 @@ describe('DocumentService', () => {
 
       const buf = await buildPdfBuffer(1);
       const created = await service.upload({ userId: 'user-1', filename: 'falla-chunks.pdf', buffer: buf });
+      vi.clearAllMocks();
 
       await expect(service.remove(created.id, 'user-1')).rejects.toThrow(chunkError);
 
       expect(deps.objectStorage.deleteObject).not.toHaveBeenCalled();
       expect(deps.documents.deleteById).not.toHaveBeenCalled();
+      expect(deps.responseCache.invalidateUser).not.toHaveBeenCalled();
       expect(deps.storedDocs.has(created.id)).toBe(true);
     });
   });

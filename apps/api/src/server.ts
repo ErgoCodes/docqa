@@ -46,6 +46,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
     objectStorage: dependencies.objectStorage,
     ingestionQueue: dependencies.ingestionQueue,
     chunkDeleter: dependencies.chunkDeleter,
+    responseCache: dependencies.responseCache,
   });
 
   const chunkService = createGetChunkService({ chunkReader: dependencies.chunkReader });
@@ -60,6 +61,7 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
     documents: dependencies.documents,
     searchChunks: searchChunksService,
     llmProvider: dependencies.llmProvider,
+    responseCache: dependencies.responseCache,
   });
 
   await app.register(registerHealthRoutes);

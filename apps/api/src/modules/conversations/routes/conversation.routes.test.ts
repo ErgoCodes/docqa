@@ -226,6 +226,62 @@ describe('conversation routes', () => {
       expect(message.createdAt).toBeDefined();
     });
 
+    it('returns X-Cache: MISS on first question and X-Cache: HIT with identical response on repeating question', async () => {
+      const mockChunks = [
+        {
+          id: 'chunk-1',
+          documentId: 'doc-1',
+          userId: 'mock-user',
+          page: 1,
+          index: 0,
+          text: 'Chunk content.',
+          score: 0.9,
+        },
+      ];
+
+      ({ app } = await buildTestApp({
+        dependencies: {
+          chunkSearcher: createInMemoryChunkSearcher(mockChunks),
+          llmProvider: createInMemoryLlmProvider('Generated assistant answer based on chunk.'),
+        },
+      }));
+
+      const token = await registerAndGetToken(app, 'user-cache-hit@example.com');
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        headers: { authorization: `Bearer ${token}` },
+        payload: {},
+      });
+      const conv = createRes.json<ConversationResponseBody>();
+
+      const firstRes = await app.inject({
+        method: 'POST',
+        url: `/conversations/${conv.id}/messages`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { question: 'What is in the document?' },
+      });
+
+      expect(firstRes.statusCode).toBe(200);
+      expect(firstRes.headers['x-cache']).toBe('MISS');
+      const firstMsg = firstRes.json<MessageResponseBody>();
+      expect(firstMsg.content).toBe('Generated assistant answer based on chunk.');
+
+      const secondRes = await app.inject({
+        method: 'POST',
+        url: `/conversations/${conv.id}/messages`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { question: '  WHAT is in the document?  ' },
+      });
+
+      expect(secondRes.statusCode).toBe(200);
+      expect(secondRes.headers['x-cache']).toBe('HIT');
+      const secondMsg = secondRes.json<MessageResponseBody>();
+      expect(secondMsg.content).toBe(firstMsg.content);
+      expect(secondMsg.citations).toEqual(firstMsg.citations);
+    });
+
     it('RNF-01: returns 404 CONVERSATION_NOT_FOUND when user B sends a message to conversation of user A', async () => {
       ({ app } = await buildTestApp());
       const tokenUserA = await registerAndGetToken(app, 'owner@example.com');

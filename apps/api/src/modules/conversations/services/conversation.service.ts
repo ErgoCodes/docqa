@@ -1,4 +1,6 @@
 import { AppError } from '../../../errors.js';
+import type { ResponseCache } from '../../cache/interfaces/response-cache.js';
+import { buildCacheKey } from '../../cache/utils/cache-key.js';
 import type { SearchChunksService } from '../../chunks/services/search-chunks.service.js';
 import type { DocumentRepository } from '../../documents/interfaces/document.repository.js';
 import type { LlmProvider } from '../../llm/interfaces/llm-provider.js';
@@ -15,17 +17,22 @@ export interface ConversationServiceDependencies {
   documents: DocumentRepository;
   searchChunks: SearchChunksService;
   llmProvider: LlmProvider;
+  responseCache: ResponseCache;
   buildPrompt?: typeof defaultBuildPrompt;
   now?: () => Date;
 }
 
 export interface ConversationService {
   create: (userId: string, documentIds: string[]) => Promise<Conversation>;
-  sendMessage: (userId: string, conversationId: string, question: string) => Promise<Message>;
+  sendMessage: (
+    userId: string,
+    conversationId: string,
+    question: string,
+  ) => Promise<{ message: Message; cacheHit: boolean }>;
 }
 
 export function createConversationService(deps: ConversationServiceDependencies): ConversationService {
-  const { conversations, documents, searchChunks, llmProvider } = deps;
+  const { conversations, documents, searchChunks, llmProvider, responseCache } = deps;
   const buildPrompt = deps.buildPrompt ?? defaultBuildPrompt;
   const now = deps.now ?? ((): Date => new Date());
 
@@ -53,32 +60,50 @@ export function createConversationService(deps: ConversationServiceDependencies)
       });
     },
 
-    sendMessage: async (userId: string, conversationId: string, question: string): Promise<Message> => {
+    sendMessage: async (
+      userId: string,
+      conversationId: string,
+      question: string,
+    ): Promise<{ message: Message; cacheHit: boolean }> => {
       const conversation = await conversations.findById(conversationId, userId);
       if (!conversation) {
         throw new AppError(ConversationErrors.NOT_FOUND);
       }
 
-      const chunks = await searchChunks.searchChunks({
-        userId,
-        question,
-        documentIds: conversation.documentIds,
-      });
+      const generation = await responseCache.getUserGeneration(userId);
+      const key = buildCacheKey({ userId, documentIds: conversation.documentIds, question, generation });
+      const cached = await responseCache.get(key);
 
       let answer: string;
       let citations: Citation[];
+      let cacheHit: boolean;
 
-      if (chunks.length === 0) {
-        answer = NO_CHUNKS_FOUND_MESSAGE;
-        citations = [];
+      if (cached !== null) {
+        answer = cached.content;
+        citations = cached.citations;
+        cacheHit = true;
       } else {
-        const prompt = buildPrompt({ question, chunks });
-        answer = await llmProvider.generate(prompt);
-        citations = chunks.map((chunk) => ({
-          chunkId: chunk.id,
-          documentId: chunk.documentId,
-          page: chunk.page,
-        }));
+        cacheHit = false;
+        const chunks = await searchChunks.searchChunks({
+          userId,
+          question,
+          documentIds: conversation.documentIds,
+        });
+
+        if (chunks.length === 0) {
+          answer = NO_CHUNKS_FOUND_MESSAGE;
+          citations = [];
+        } else {
+          const prompt = buildPrompt({ question, chunks });
+          answer = await llmProvider.generate(prompt);
+          citations = chunks.map((chunk) => ({
+            chunkId: chunk.id,
+            documentId: chunk.documentId,
+            page: chunk.page,
+          }));
+        }
+
+        await responseCache.set(key, { content: answer, citations });
       }
 
       const userMessage: Message = {
@@ -97,7 +122,7 @@ export function createConversationService(deps: ConversationServiceDependencies)
 
       await conversations.appendMessages(conversationId, userId, [userMessage, assistantMessage]);
 
-      return assistantMessage;
+      return { message: assistantMessage, cacheHit };
     },
   };
 }
