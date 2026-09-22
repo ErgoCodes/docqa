@@ -11,7 +11,9 @@ import { createMongoRefreshTokenRepository } from './modules/auth/repositories/m
 import { createMongoUserRepository } from './modules/auth/repositories/mongo-user.repository.js';
 import { createArgon2Hasher } from './modules/auth/utils/password-hasher.js';
 import type { ChunkDeleter } from './modules/chunks/interfaces/chunk-deleter.js';
+import type { ChunkSearcher } from './modules/chunks/interfaces/chunk-searcher.js';
 import { createMongoChunkDeleter } from './modules/chunks/repositories/mongo-chunk-deleter.js';
+import { createMongoChunkSearcher } from './modules/chunks/repositories/mongo-chunk-searcher.js';
 import type { ConversationRepository } from './modules/conversations/interfaces/conversation.repository.js';
 import { createMongoConversationRepository } from './modules/conversations/repositories/mongo-conversation.repository.js';
 import type { DocumentRepository } from './modules/documents/interfaces/document.repository.js';
@@ -23,6 +25,8 @@ import {
 } from './modules/documents/repositories/bullmq-ingestion-queue.js';
 import { createMinioObjectStorage } from './modules/documents/repositories/minio-object-storage.js';
 import { createMongoDocumentRepository } from './modules/documents/repositories/mongo-document.repository.js';
+import type { EmbeddingsProvider } from './modules/embeddings/interfaces/embeddings-provider.js';
+import { createVoyageEmbeddingsProvider } from './modules/embeddings/repositories/voyage-embeddings.provider.js';
 
 export interface AppDependencies {
   users: UserRepository;
@@ -32,6 +36,8 @@ export interface AppDependencies {
   objectStorage: ObjectStorage;
   ingestionQueue: IngestionQueue;
   chunkDeleter: ChunkDeleter;
+  chunkSearcher: ChunkSearcher;
+  embeddingsProvider: EmbeddingsProvider;
   hasher: PasswordHasher;
   close: () => Promise<void>;
 }
@@ -54,6 +60,11 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
     objectStorage: createMinioObjectStorage(minioClient, config.MINIO_BUCKET),
     ingestionQueue: createBullmqIngestionQueue(bullmqQueue),
     chunkDeleter: createMongoChunkDeleter(db),
+    chunkSearcher: createMongoChunkSearcher(db),
+    embeddingsProvider: createVoyageEmbeddingsProvider({
+      apiKey: config.VOYAGE_API_KEY,
+      model: config.EMBEDDINGS_MODEL,
+    }),
     hasher: createArgon2Hasher({
       memoryCost: config.ARGON2_MEMORY_COST,
       timeCost: config.ARGON2_TIME_COST,

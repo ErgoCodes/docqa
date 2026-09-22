@@ -24,6 +24,8 @@ export function createTestConfig(overrides: Partial<AppConfig> = {}): AppConfig 
     ARGON2_MEMORY_COST: 8,
     ARGON2_TIME_COST: 1,
     ARGON2_PARALLELISM: 1,
+    VOYAGE_API_KEY: 'test-voyage-key',
+    EMBEDDINGS_MODEL: 'voyage-3-lite',
     ...overrides,
   };
 }
