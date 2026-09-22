@@ -8,7 +8,7 @@ import { createInMemoryChunkSearcher, createInMemoryLlmProvider } from '../../..
 interface ConversationResponseBody {
   id: string;
   documentIds: string[];
-  messages: unknown[];
+  messages: MessageResponseBody[];
   createdAt: string;
 }
 
@@ -136,6 +136,125 @@ describe('conversation routes', () => {
     expect(res.statusCode).toBe(404);
     const body = res.json<ErrorResponseBody>();
     expect(body.error.code).toBe('CONVERSATION_DOCUMENT_NOT_FOUND');
+  });
+
+  describe('GET /conversations/:id', () => {
+    it('rejects unauthenticated requests with 401', async () => {
+      ({ app } = await buildTestApp());
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/conversations/conv-123',
+      });
+
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('returns conversation with full history (messages and citations)', async () => {
+      const mockChunks = [
+        {
+          id: 'chunk-1',
+          documentId: 'doc-1',
+          userId: 'mock-user',
+          page: 1,
+          index: 0,
+          text: 'Chunk content.',
+          score: 0.9,
+        },
+      ];
+
+      ({ app } = await buildTestApp({
+        dependencies: {
+          chunkSearcher: createInMemoryChunkSearcher(mockChunks),
+          llmProvider: createInMemoryLlmProvider('Assistant response text.'),
+        },
+      }));
+
+      const token = await registerAndGetToken(app, 'history-user@example.com');
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        headers: { authorization: `Bearer ${token}` },
+        payload: {},
+      });
+      const createdConv = createRes.json<ConversationResponseBody>();
+
+      await app.inject({
+        method: 'POST',
+        url: `/conversations/${createdConv.id}/messages`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { question: 'What is in the document?' },
+      });
+
+      const getRes = await app.inject({
+        method: 'GET',
+        url: `/conversations/${createdConv.id}`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      expect(getRes.statusCode).toBe(200);
+      const conversation = getRes.json<ConversationResponseBody>();
+      expect(conversation.id).toBe(createdConv.id);
+      expect(conversation.documentIds).toEqual([]);
+      expect(conversation.messages).toHaveLength(2);
+      expect(conversation.messages[0]).toMatchObject({
+        role: 'user',
+        content: 'What is in the document?',
+        citations: [],
+      });
+      expect(conversation.messages[1]).toMatchObject({
+        role: 'assistant',
+        content: 'Assistant response text.',
+        citations: [
+          {
+            chunkId: 'chunk-1',
+            documentId: 'doc-1',
+            page: 1,
+          },
+        ],
+      });
+      expect(conversation.createdAt).toBeDefined();
+    });
+
+    it('RNF-01: returns 404 CONVERSATION_NOT_FOUND when user B requests conversation of user A', async () => {
+      ({ app } = await buildTestApp());
+      const tokenUserA = await registerAndGetToken(app, 'owner-get@example.com');
+      const tokenUserB = await registerAndGetToken(app, 'intruder-get@example.com');
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        headers: { authorization: `Bearer ${tokenUserA}` },
+        payload: {},
+      });
+      const conv = createRes.json<ConversationResponseBody>();
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/conversations/${conv.id}`,
+        headers: { authorization: `Bearer ${tokenUserB}` },
+      });
+
+      expect(res.statusCode).toBe(404);
+      const body = res.json<ErrorResponseBody>();
+      expect(body.error.code).toBe('CONVERSATION_NOT_FOUND');
+    });
+
+    it('returns 404 CONVERSATION_NOT_FOUND when conversation does not exist', async () => {
+      ({ app } = await buildTestApp());
+      const token = await registerAndGetToken(app, 'user-notfound-get@example.com');
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/conversations/non-existent-conv-id',
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      expect(res.statusCode).toBe(404);
+      const body = res.json<ErrorResponseBody>();
+      expect(body.error.code).toBe('CONVERSATION_NOT_FOUND');
+    });
   });
 
   describe('POST /conversations/:id/messages', () => {

@@ -20,6 +20,7 @@ export interface ConversationServiceDependencies {
 }
 
 export interface ConversationService {
+  getById: (id: string, userId: string) => Promise<Conversation>;
   create: (userId: string, documentIds: string[]) => Promise<Conversation>;
   sendMessage: (userId: string, conversationId: string, question: string) => Promise<Message>;
 }
@@ -30,6 +31,14 @@ export function createConversationService(deps: ConversationServiceDependencies)
   const now = deps.now ?? ((): Date => new Date());
 
   return {
+    getById: async (id: string, userId: string): Promise<Conversation> => {
+      const conversation = await conversations.findById(id, userId);
+      if (!conversation) {
+        throw new AppError(ConversationErrors.NOT_FOUND);
+      }
+      return conversation;
+    },
+
     create: async (userId: string, documentIds: string[]): Promise<Conversation> => {
       const uniqueDocumentIds = Array.from(new Set(documentIds));
 

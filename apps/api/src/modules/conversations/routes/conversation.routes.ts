@@ -20,6 +20,12 @@ export const registerConversationRoutes: FastifyPluginAsync<ConversationRoutesOp
     return conversationResponseSchema.parse(conversation);
   });
 
+  app.get('/conversations/:id', { preHandler: app.authenticate }, async (request) => {
+    const params = conversationIdParamsSchema.parse(request.params);
+    const conversation = await service.getById(params.id, request.user.sub);
+    return conversationResponseSchema.parse(conversation);
+  });
+
   app.post('/conversations/:id/messages', { preHandler: app.authenticate }, async (request, reply) => {
     const params = conversationIdParamsSchema.parse(request.params);
     const body = sendMessageBodySchema.parse(request.body);
