@@ -85,7 +85,7 @@ La prioridad es el aislamiento entre usuarios: ninguna consulta, tampoco la vect
 - RNF-10: TypeScript estricto en todo el proyecto.
 - RNF-11: Tests con Vitest; cobertura mínima del 80% en la lógica de dominio (fragmentación, construcción del prompt, claves de caché, citas).
 - RNF-12: GitHub Actions ejecuta lint, verificación de tipos y tests en cada push y pull request.
-- RNF-13: Un solo comando (`docker compose up`) levanta todo el entorno local.
+- RNF-13: `docker compose up` levanta la infraestructura local (MongoDB, Redis, MinIO); `pnpm install && pnpm dev` arranca frontend, API y worker sobre esa infraestructura. Entre los dos comandos, sin pasos manuales adicionales, el entorno completo queda arriba.
 
 ## 5. Arquitectura y stack
 
@@ -159,7 +159,7 @@ Trece endpoints REST; todos salvo registro, login, renovación, cierre de sesió
 
 El MVP está terminado cuando se cumplen todos estos puntos, comprobables por cualquier persona que clone el repositorio.
 
-- [ ] Con `docker compose up` y el `.env.example` completado, la aplicación arranca desde cero en local.
+- [ ] Con `.env.example` completado, `docker compose up` (infraestructura) y `pnpm install && pnpm dev` (apps), la aplicación arranca desde cero en local.
 - [ ] Un PDF de 20 páginas pasa a estado "listo" en menos de 60 s.
 - [ ] Una pregunta cuya respuesta está en el PDF devuelve la respuesta y al menos una cita con la página correcta.
 - [ ] Una pregunta sin respuesta en los documentos devuelve un mensaje de que no se encontró esa información, sin inventar.
@@ -193,3 +193,4 @@ Decidido: los embeddings se generan con una API desde el inicio. Los riesgos pri
 - **Inyección de prompts desde los documentos.** Se mitiga con RNF-05 y porque el sistema no ejecuta acciones: solo responde texto.
 - **PDFs escaneados.** Quedan fuera de alcance; si no tienen texto extraíble, el documento pasa a estado "error" con un mensaje claro.
 - **Dónde desplegar la demo.** Opciones como Render, Railway o Fly.io; se decide en la fase 4.
+- **Alcance de `docker compose up`.** Decidido: `docker-compose.yml` levanta solo infraestructura (MongoDB, Redis, MinIO), como ya scopea la Fase 1 (sección 9); frontend, API y worker corren con `pnpm dev` sobre esa infraestructura. RNF-13 y el criterio de aceptación de la sección 8 se corrigieron el 2026-09-23 (TSK-70) para nombrar ambos comandos en vez de dar a entender que `docker compose up` por sí solo levanta las tres apps. Dockerizar frontend/api/worker para que un único comando lo cubra todo queda fuera de alcance de TSK-70; si se decide perseguirlo, es una tarea aparte en el tablero de Notion.
