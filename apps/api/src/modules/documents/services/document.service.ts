@@ -1,4 +1,5 @@
 import { AppError } from '../../../errors.js';
+import type { ResponseCache } from '../../cache/interfaces/response-cache.js';
 import type { ChunkDeleter } from '../../chunks/interfaces/chunk-deleter.js';
 import type { DocumentRepository } from '../interfaces/document.repository.js';
 import type { IngestionQueue } from '../interfaces/ingestion-queue.js';
@@ -13,6 +14,7 @@ export interface DocumentServiceDependencies {
   objectStorage: ObjectStorage;
   ingestionQueue: IngestionQueue;
   chunkDeleter: ChunkDeleter;
+  responseCache: ResponseCache;
   now?: () => Date;
 }
 
@@ -30,7 +32,7 @@ export interface DocumentService {
 }
 
 export function createDocumentService(deps: DocumentServiceDependencies): DocumentService {
-  const { documents, objectStorage, ingestionQueue, chunkDeleter } = deps;
+  const { documents, objectStorage, ingestionQueue, chunkDeleter, responseCache } = deps;
   const now = deps.now ?? ((): Date => new Date());
 
   return {
@@ -69,6 +71,7 @@ export function createDocumentService(deps: DocumentServiceDependencies): Docume
       // Si enqueue falla, el error se propaga sin rollback del insert/putObject
       // anteriores: revertirlos sería sobre-ingeniería para este alcance.
       await ingestionQueue.enqueue(doc.id);
+      await responseCache.invalidateUser(userId);
 
       return doc;
     },
@@ -102,6 +105,7 @@ export function createDocumentService(deps: DocumentServiceDependencies): Docume
       await chunkDeleter.deleteByDocumentId(id, userId);
       await objectStorage.deleteObject(doc.storageKey);
       await documents.deleteById(id, userId);
+      await responseCache.invalidateUser(userId);
     },
   };
 }

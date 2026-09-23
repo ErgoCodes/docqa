@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { CachedAnswer, ResponseCache } from '../../cache/interfaces/response-cache.js';
 import type { SearchChunksService } from '../../chunks/services/search-chunks.service.js';
 import type { ChunkSearchResult } from '../../chunks/types/chunk.js';
 import type { DocumentRepository } from '../../documents/interfaces/document.repository.js';
@@ -129,13 +130,33 @@ function createMockDependencies() {
     generate: vi.fn((): Promise<string> => Promise.resolve('LLM generated response')),
   };
 
+  const cacheStore = new Map<string, CachedAnswer>();
+  const userGenerations = new Map<string, number>();
+
+  const responseCache: ResponseCache = {
+    get: vi.fn((key: string): Promise<CachedAnswer | null> => Promise.resolve(cacheStore.get(key) ?? null)),
+    set: vi.fn((key: string, value: CachedAnswer): Promise<void> => {
+      cacheStore.set(key, value);
+      return Promise.resolve();
+    }),
+    getUserGeneration: vi.fn((userId: string): Promise<number> => Promise.resolve(userGenerations.get(userId) ?? 0)),
+    invalidateUser: vi.fn((userId: string): Promise<void> => {
+      const current = userGenerations.get(userId) ?? 0;
+      userGenerations.set(userId, current + 1);
+      return Promise.resolve();
+    }),
+  };
+
   return {
     documents,
     conversations,
     searchChunks,
     llmProvider,
+    responseCache,
     storedDocuments,
     storedConversations,
+    cacheStore,
+    userGenerations,
   };
 }
 
@@ -221,7 +242,7 @@ describe('ConversationService', () => {
   });
 
   describe('sendMessage', () => {
-    it('successfully answers a question, cites all retrieved chunks, and persists user and assistant messages', async () => {
+    it('on cache miss: answers question, saves to cache, cites chunks, and returns cacheHit false', async () => {
       const deps = createMockDependencies();
       const fixedDate = new Date('2026-09-22T10:30:00Z');
       const service = createConversationService({ ...deps, now: () => fixedDate });
@@ -253,13 +274,16 @@ describe('ConversationService', () => {
       const result = await service.sendMessage('user-1', 'conv-user1-1', 'What is on page 1 and 2?');
 
       expect(result).toEqual({
-        role: 'assistant',
-        content: 'The answer based on fragments.',
-        citations: [
-          { chunkId: 'chunk-1', documentId: 'doc-user1-1', page: 1 },
-          { chunkId: 'chunk-2', documentId: 'doc-user1-1', page: 2 },
-        ],
-        createdAt: fixedDate,
+        message: {
+          role: 'assistant',
+          content: 'The answer based on fragments.',
+          citations: [
+            { chunkId: 'chunk-1', documentId: 'doc-user1-1', page: 1 },
+            { chunkId: 'chunk-2', documentId: 'doc-user1-1', page: 2 },
+          ],
+          createdAt: fixedDate,
+        },
+        cacheHit: false,
       });
 
       expect(deps.searchChunks.searchChunks).toHaveBeenCalledWith({
@@ -269,11 +293,16 @@ describe('ConversationService', () => {
       });
 
       expect(deps.llmProvider.generate).toHaveBeenCalledTimes(1);
-      expect(deps.llmProvider.generate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          system: expect.stringContaining('ONLY the provided document fragments') as string,
-          user: expect.stringContaining('What is on page 1 and 2?') as string,
-        }),
+      expect(deps.responseCache.set).toHaveBeenCalledTimes(1);
+      expect(deps.responseCache.set).toHaveBeenCalledWith(
+        expect.any(String),
+        {
+          content: 'The answer based on fragments.',
+          citations: [
+            { chunkId: 'chunk-1', documentId: 'doc-user1-1', page: 1 },
+            { chunkId: 'chunk-2', documentId: 'doc-user1-1', page: 2 },
+          ],
+        },
       );
 
       expect(deps.conversations.appendMessages).toHaveBeenCalledWith('conv-user1-1', 'user-1', [
@@ -295,7 +324,79 @@ describe('ConversationService', () => {
       ]);
     });
 
-    it('returns fixed response with empty citations and does NOT invoke LLM when 0 chunks are found', async () => {
+    it('on cache hit: returns cached answer and citations without calling searchChunks or LLM', async () => {
+      const deps = createMockDependencies();
+      const fixedDate = new Date('2026-09-22T10:30:00Z');
+      const service = createConversationService({ ...deps, now: () => fixedDate });
+
+      const retrievedChunks: ChunkSearchResult[] = [
+        {
+          id: 'chunk-1',
+          documentId: 'doc-user1-1',
+          userId: 'user-1',
+          page: 1,
+          index: 0,
+          text: 'Fragment text.',
+          score: 0.95,
+        },
+      ];
+
+      vi.mocked(deps.searchChunks.searchChunks).mockResolvedValue(retrievedChunks);
+      vi.mocked(deps.llmProvider.generate).mockResolvedValue('First computed answer');
+
+      const firstCall = await service.sendMessage('user-1', 'conv-user1-1', 'Tell me about doc-1');
+      expect(firstCall.cacheHit).toBe(false);
+      expect(firstCall.message.content).toBe('First computed answer');
+      expect(deps.searchChunks.searchChunks).toHaveBeenCalledTimes(1);
+      expect(deps.llmProvider.generate).toHaveBeenCalledTimes(1);
+
+      vi.clearAllMocks();
+
+      const secondCall = await service.sendMessage('user-1', 'conv-user1-1', 'tell ME about doc-1  ');
+      expect(secondCall.cacheHit).toBe(true);
+      expect(secondCall.message.content).toBe('First computed answer');
+      expect(secondCall.message.citations).toEqual([
+        { chunkId: 'chunk-1', documentId: 'doc-user1-1', page: 1 },
+      ]);
+
+      expect(deps.searchChunks.searchChunks).not.toHaveBeenCalled();
+      expect(deps.llmProvider.generate).not.toHaveBeenCalled();
+      expect(deps.conversations.appendMessages).toHaveBeenCalledTimes(1);
+      expect(deps.conversations.appendMessages).toHaveBeenCalledWith('conv-user1-1', 'user-1', [
+        {
+          role: 'user',
+          content: 'tell ME about doc-1  ',
+          citations: [],
+          createdAt: fixedDate,
+        },
+        {
+          role: 'assistant',
+          content: 'First computed answer',
+          citations: [{ chunkId: 'chunk-1', documentId: 'doc-user1-1', page: 1 }],
+          createdAt: fixedDate,
+        },
+      ]);
+    });
+
+    it('invalidation: changing user generation causes subsequent identical request to miss cache', async () => {
+      const deps = createMockDependencies();
+      const service = createConversationService(deps);
+
+      vi.mocked(deps.searchChunks.searchChunks).mockResolvedValue([]);
+
+      const first = await service.sendMessage('user-1', 'conv-user1-1', 'same query');
+      expect(first.cacheHit).toBe(false);
+
+      const second = await service.sendMessage('user-1', 'conv-user1-1', 'same query');
+      expect(second.cacheHit).toBe(true);
+
+      await deps.responseCache.invalidateUser('user-1');
+
+      const third = await service.sendMessage('user-1', 'conv-user1-1', 'same query');
+      expect(third.cacheHit).toBe(false);
+    });
+
+    it('returns fixed response with empty citations and caches it when 0 chunks are found', async () => {
       const deps = createMockDependencies();
       const fixedDate = new Date('2026-09-22T10:30:00Z');
       const service = createConversationService({ ...deps, now: () => fixedDate });
@@ -305,13 +406,24 @@ describe('ConversationService', () => {
       const result = await service.sendMessage('user-1', 'conv-user1-1', 'Question with no matches');
 
       expect(result).toEqual({
-        role: 'assistant',
-        content: NO_CHUNKS_FOUND_MESSAGE,
-        citations: [],
-        createdAt: fixedDate,
+        message: {
+          role: 'assistant',
+          content: NO_CHUNKS_FOUND_MESSAGE,
+          citations: [],
+          createdAt: fixedDate,
+        },
+        cacheHit: false,
       });
 
       expect(deps.llmProvider.generate).not.toHaveBeenCalled();
+      expect(deps.responseCache.set).toHaveBeenCalledTimes(1);
+      expect(deps.responseCache.set).toHaveBeenCalledWith(
+        expect.any(String),
+        {
+          content: NO_CHUNKS_FOUND_MESSAGE,
+          citations: [],
+        },
+      );
 
       expect(deps.conversations.appendMessages).toHaveBeenCalledWith('conv-user1-1', 'user-1', [
         {

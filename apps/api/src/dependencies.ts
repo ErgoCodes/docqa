@@ -10,6 +10,8 @@ import type { UserRepository } from './modules/auth/interfaces/user.repository.j
 import { createMongoRefreshTokenRepository } from './modules/auth/repositories/mongo-refresh-token.repository.js';
 import { createMongoUserRepository } from './modules/auth/repositories/mongo-user.repository.js';
 import { createArgon2Hasher } from './modules/auth/utils/password-hasher.js';
+import type { ResponseCache } from './modules/cache/interfaces/response-cache.js';
+import { createRedisResponseCache } from './modules/cache/repositories/redis-response-cache.js';
 import type { ChunkDeleter } from './modules/chunks/interfaces/chunk-deleter.js';
 import type { ChunkReader } from './modules/chunks/interfaces/chunk-reader.js';
 import type { ChunkSearcher } from './modules/chunks/interfaces/chunk-searcher.js';
@@ -44,6 +46,7 @@ export interface AppDependencies {
   chunkSearcher: ChunkSearcher;
   embeddingsProvider: EmbeddingsProvider;
   llmProvider: LlmProvider;
+  responseCache: ResponseCache;
   hasher: PasswordHasher;
   close: () => Promise<void>;
 }
@@ -76,6 +79,7 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
       apiKey: config.CLAUDE_API_KEY,
       model: config.CLAUDE_MODEL,
     }),
+    responseCache: createRedisResponseCache(redisConnection),
     hasher: createArgon2Hasher({
       memoryCost: config.ARGON2_MEMORY_COST,
       timeCost: config.ARGON2_TIME_COST,

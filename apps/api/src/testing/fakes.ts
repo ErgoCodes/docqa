@@ -5,6 +5,7 @@ import type { NewUser, UserRepository } from '../modules/auth/interfaces/user.re
 import type { RefreshToken, RevokedReason } from '../modules/auth/types/refresh-token.js';
 import { DuplicateEmailError, type User } from '../modules/auth/types/user.js';
 import { createArgon2Hasher } from '../modules/auth/utils/password-hasher.js';
+import type { CachedAnswer, ResponseCache } from '../modules/cache/interfaces/response-cache.js';
 import type { ChunkDeleter } from '../modules/chunks/interfaces/chunk-deleter.js';
 import type { ChunkReader } from '../modules/chunks/interfaces/chunk-reader.js';
 import type { ChunkSearcher } from '../modules/chunks/interfaces/chunk-searcher.js';
@@ -220,6 +221,25 @@ export function createInMemoryIngestionQueue(): IngestionQueue {
   };
 }
 
+export function createInMemoryResponseCache(): ResponseCache {
+  const store = new Map<string, CachedAnswer>();
+  const generations = new Map<string, number>();
+
+  return {
+    get: (key: string): Promise<CachedAnswer | null> => Promise.resolve(store.get(key) ?? null),
+    set: (key: string, value: CachedAnswer): Promise<void> => {
+      store.set(key, value);
+      return Promise.resolve();
+    },
+    getUserGeneration: (userId: string): Promise<number> => Promise.resolve(generations.get(userId) ?? 0),
+    invalidateUser: (userId: string): Promise<void> => {
+      const current = generations.get(userId) ?? 0;
+      generations.set(userId, current + 1);
+      return Promise.resolve();
+    },
+  };
+}
+
 export function createInMemoryDependencies(): AppDependencies {
   return {
     users: createInMemoryUserRepository(),
@@ -233,9 +253,11 @@ export function createInMemoryDependencies(): AppDependencies {
     chunkSearcher: createInMemoryChunkSearcher(),
     embeddingsProvider: createInMemoryEmbeddingsProvider(),
     llmProvider: createInMemoryLlmProvider(),
+    responseCache: createInMemoryResponseCache(),
     // Argon2 real con memoryCost mínimo, no un mock: cubre el camino
     // crítico sin pagar su coste en cada test (~1-5ms por hash).
     hasher: createArgon2Hasher({ memoryCost: 8, timeCost: 1, parallelism: 1 }),
     close: () => Promise.resolve(),
   };
 }
+

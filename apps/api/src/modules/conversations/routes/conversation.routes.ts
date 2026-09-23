@@ -24,8 +24,8 @@ export const registerConversationRoutes: FastifyPluginAsync<ConversationRoutesOp
     const params = conversationIdParamsSchema.parse(request.params);
     const body = sendMessageBodySchema.parse(request.body);
     const result = await service.sendMessage(request.user.sub, params.id, body.question);
-    void reply.header('X-Cache', 'MISS');
-    return messageResponseSchema.parse(result);
+    void reply.header('X-Cache', result.cacheHit ? 'HIT' : 'MISS');
+    return messageResponseSchema.parse(result.message);
   });
 
   return Promise.resolve();
