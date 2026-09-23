@@ -161,6 +161,46 @@ function createMockDependencies() {
 }
 
 describe('ConversationService', () => {
+  describe('getById', () => {
+    it('returns conversation when found and belongs to the user', async () => {
+      const deps = createMockDependencies();
+      const service = createConversationService(deps);
+
+      const result = await service.getById('conv-user1-1', 'user-1');
+
+      expect(result).toEqual({
+        id: 'conv-user1-1',
+        userId: 'user-1',
+        documentIds: ['doc-user1-1'],
+        messages: [],
+        createdAt: new Date('2026-09-10T00:00:00Z'),
+      });
+      expect(deps.conversations.findById).toHaveBeenCalledWith('conv-user1-1', 'user-1');
+    });
+
+    it('throws CONVERSATION_NOT_FOUND (404) when conversation does not exist', async () => {
+      const deps = createMockDependencies();
+      const service = createConversationService(deps);
+
+      await expect(service.getById('non-existent-conv', 'user-1')).rejects.toMatchObject({
+        code: 'CONVERSATION_NOT_FOUND',
+        statusCode: 404,
+      });
+      expect(deps.conversations.findById).toHaveBeenCalledWith('non-existent-conv', 'user-1');
+    });
+
+    it('RNF-01: throws CONVERSATION_NOT_FOUND (404) when conversation belongs to another user', async () => {
+      const deps = createMockDependencies();
+      const service = createConversationService(deps);
+
+      await expect(service.getById('conv-user2-1', 'user-1')).rejects.toMatchObject({
+        code: 'CONVERSATION_NOT_FOUND',
+        statusCode: 404,
+      });
+      expect(deps.conversations.findById).toHaveBeenCalledWith('conv-user2-1', 'user-1');
+    });
+  });
+
   describe('create', () => {
     it('creates a conversation with empty documentIds and empty messages', async () => {
       const deps = createMockDependencies();
