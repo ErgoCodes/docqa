@@ -6,7 +6,11 @@ import { createProcessor, QUEUE_NAME } from './queue.js';
 
 const config = loadConfig();
 const dependencies = await createWorkerDependencies(config);
-const processor = createProcessor({ extraction: dependencies.extraction });
+const processor = createProcessor({
+  documents: dependencies.documents,
+  extraction: dependencies.extraction,
+  embedAndIndex: dependencies.embedAndIndex,
+});
 
 const connection = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
 const worker = new Worker(QUEUE_NAME, processor, { connection, concurrency: config.WORKER_CONCURRENCY });
