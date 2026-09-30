@@ -13,7 +13,7 @@ const validEnv = {
   MINIO_BUCKET: 'docqa-documents',
   JWT_SECRET: 'x'.repeat(32),
   VOYAGE_API_KEY: 'test-voyage-key',
-  CLAUDE_API_KEY: 'test-claude-key',
+  GROQ_API_KEY: 'test-groq-key',
 };
 
 describe('loadConfig', () => {
@@ -24,7 +24,7 @@ describe('loadConfig', () => {
     expect(config.API_HOST).toBe('0.0.0.0');
     expect(config.ACCESS_TOKEN_TTL_SECONDS).toBe(900);
     expect(config.REFRESH_TOKEN_TTL_DAYS).toBe(7);
-    expect(config.CLAUDE_MODEL).toBe('claude-haiku-4-5');
+    expect(config.GROQ_MODEL).toBe('openai/gpt-oss-120b');
   });
 
   it('lanza con un mensaje legible cuando falta JWT_SECRET', () => {
