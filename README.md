@@ -4,7 +4,7 @@ Asistente RAG sobre documentos: sube un PDF, pregúntale en lenguaje natural y r
 
 ## Estado
 
-En desarrollo. Tablero de tareas: [DocQA en Notion](https://app.notion.com/p/3e019c33c39081348924d13fbfd11d15). El frontend actual es un placeholder sin flujo funcional todavía (el registro/login, la subida de archivos y el chat no están implementados en la interfaz de usuario).
+MVP funcional de extremo a extremo: registro e inicio de sesión, subida de PDF con procesamiento en segundo plano, preguntas sobre uno o varios documentos con respuestas citadas (clic en la cita para ver el fragmento), historial de conversaciones, caché de respuestas y límite de preguntas por minuto. Pendiente para cerrar el MVP: el GIF de demostración y decidir dónde desplegar la demo. Tablero de tareas: [DocQA en Notion](https://app.notion.com/p/3e019c33c39081348924d13fbfd11d15).
 
 ## Requisitos
 
@@ -170,9 +170,7 @@ El aislamiento multi-usuario y multi-documento (RNF-01) se garantiza directament
 
 ## Demo
 
-Pendiente de grabar: el frontend todavía no tiene el flujo de registro/login, subida de PDF y chat operativo (ver "Estado" arriba), así que por ahora no hay una demo interactiva que grabar.
-
-<!-- TODO: grabar GIF de demo (subir PDF, hacer una pregunta, ver la respuesta citada) -->
+GIF pendiente de grabar: el flujo completo ya funciona en la interfaz (subir un PDF, esperar a que pase a "listo", hacer una pregunta y abrir una cita), así que se puede reproducir en local siguiendo "Cómo ejecutarlo".
 
 ## Uso de IA en el desarrollo
 
