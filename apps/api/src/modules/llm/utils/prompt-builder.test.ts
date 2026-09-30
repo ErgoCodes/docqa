@@ -36,6 +36,15 @@ describe('buildPrompt', () => {
     expect(system).toContain('<fragment>');
   });
 
+  it('instructs the model to always answer in the language of the question', () => {
+    const { system } = buildPrompt({
+      question: '¿Cuál es la arquitectura?',
+      chunks: sampleChunks,
+    });
+
+    expect(system).toContain('Always answer in the same language the question was asked in');
+  });
+
   it('formats fragments with documentId and page attributes in user prompt', () => {
     const question = 'What are the system components?';
     const { user } = buildPrompt({
