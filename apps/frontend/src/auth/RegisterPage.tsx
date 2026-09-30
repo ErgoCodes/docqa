@@ -70,6 +70,7 @@ export function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <form
+          className="flex flex-col gap-6"
           onSubmit={(e) => {
             void handleSubmit(e);
           }}

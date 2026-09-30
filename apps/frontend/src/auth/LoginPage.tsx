@@ -59,6 +59,7 @@ export function LoginPage() {
           </CardDescription>
         </CardHeader>
         <form
+          className="flex flex-col gap-6"
           onSubmit={(e) => {
             void handleSubmit(e);
           }}
