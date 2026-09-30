@@ -20,7 +20,7 @@ requisitos se convierte en semanas de trabajo en la dirección equivocada.
 - **Base de datos**: MongoDB Atlas con Vector Search.
 - **Caché y límites**: Redis.
 - **Archivos**: MinIO (compatible con S3).
-- **Generación**: API de Claude (Haiku) u otro LLM.
+- **Generación**: Groq (`openai/gpt-oss-120b`).
 - **Calidad**: Vitest, ESLint, GitHub Actions, Docker Compose.
 
 ## Estructura

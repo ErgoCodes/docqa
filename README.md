@@ -28,7 +28,7 @@ flowchart LR
 
 El sistema opera a través de dos flujos principales desacoplados:
 
-- **Flujo de preguntas**: la API recibe la consulta y comprueba primero la caché en Redis. Si hay un fallo de caché (*cache miss*), genera el vector de la pregunta mediante la API de Voyage AI y ejecuta una búsqueda semántica vectorial en MongoDB Atlas, recuperando los 5 fragmentos más similares. Posteriormente, ensambla un prompt para Claude que aísla estrictamente las instrucciones del sistema respecto a los fragmentos de datos, envía la petición al LLM y persiste la respuesta generada asociándole sus citas exactas (documento y página), retornando el resultado con la cabecera `X-Cache`.
+- **Flujo de preguntas**: la API recibe la consulta y comprueba primero la caché en Redis. Si hay un fallo de caché (*cache miss*), genera el vector de la pregunta mediante la API de Voyage AI y ejecuta una búsqueda semántica vectorial en MongoDB Atlas, recuperando los 5 fragmentos más similares. Posteriormente, ensambla un prompt para el LLM que aísla estrictamente las instrucciones del sistema respecto a los fragmentos de datos, envía la petición vía Groq y persiste la respuesta generada asociándole sus citas exactas (documento y página), retornando el resultado con la cabecera `X-Cache`.
 - **Flujo de ingesta**: al subir un archivo PDF validado estructuralmente, la API lo almacena en MinIO y encola un trabajo en BullMQ (Redis). El worker de ingesta toma el trabajo de forma asíncrona, extrae el texto página por página, lo divide en fragmentos semánticos (~800 tokens con 100 de solapamiento), genera sus representaciones vectoriales a través de Voyage AI y persiste los fragmentos y embeddings en MongoDB Atlas.
 
 El aislamiento multi-usuario y multi-documento (RNF-01) se garantiza directamente a nivel de base de datos: el filtro por `userId` y `documentId` está declarado como campo de tipo `filter` dentro de la propia definición del índice vectorial de MongoDB Atlas (`chunks_vector_index`) y se evalúa internamente en la etapa `$vectorSearch` de agregación, descartando datos no autorizados en la búsqueda antes de devolver resultados.
@@ -38,17 +38,17 @@ El aislamiento multi-usuario y multi-documento (RNF-01) se garantiza directament
 - **Frontend**: React 19.0.0, Vite 6.0.11, TanStack Query 5.65.1, TanStack Router 1.98.6, Tailwind CSS 4.0.3.
 - **API**: Node.js 20.18.0, Fastify 5.2.1, TypeScript 5.7.3, Zod 3.24.1, BullMQ 5.34.6, ioredis 5.4.2, driver de MongoDB 6.21.0, cliente de MinIO 8.0.7, pdf-lib 1.17.1, @node-rs/argon2 2.2.1, @fastify/jwt 10.2.2, @fastify/cors 11.3.0, @fastify/helmet 13.1.1.
 - **Worker de ingesta**: BullMQ 5.34.6, ioredis 5.4.2, driver de MongoDB 6.21.0, cliente de MinIO 8.0.7, unpdf 1.8.1 (extracción de texto), pdf-lib 1.17.1 (validación estructural).
-- **Embeddings y LLM**: Voyage AI (modelo `voyage-3-lite`, 512 dimensiones), API de Claude (modelo `claude-haiku-4-5`).
+- **Embeddings y LLM**: Voyage AI (modelo `voyage-3-lite`, 512 dimensiones), Groq (modelo `openai/gpt-oss-120b`).
 - **Infraestructura y calidad**: MongoDB (`mongodb/mongodb-atlas-local:8.0.30`, con Vector Search incluido), Redis, MinIO, Turborepo 2.4.0, Vitest 3.0.5, ESLint 9.19.0, GitHub Actions, Docker Compose, pnpm 12.3.4.
 
 ## Cómo ejecutarlo
 
-1. **Prerrequisitos**: Docker y Docker Compose, Node.js 20.18.0 (`nvm use`, ver `.nvmrc`), pnpm 12.3.4 vía Corepack (`corepack enable && corepack prepare pnpm@12.3.4 --activate`), y una API key de Voyage AI y otra de Anthropic (Claude).
+1. **Prerrequisitos**: Docker y Docker Compose, Node.js 20.18.0 (`nvm use`, ver `.nvmrc`), pnpm 12.3.4 vía Corepack (`corepack enable && corepack prepare pnpm@12.3.4 --activate`), y una API key de Voyage AI y otra de Groq.
 2. **Variables de entorno**:
    ```bash
    cp .env.example .env
    ```
-   Completar `VOYAGE_API_KEY` y `CLAUDE_API_KEY`, y generar `JWT_SECRET` (por ejemplo con `openssl rand -base64 48`, como ya sugiere el propio `.env.example`).
+   Completar `VOYAGE_API_KEY` y `GROQ_API_KEY`, y generar `JWT_SECRET` (por ejemplo con `openssl rand -base64 48`, como ya sugiere el propio `.env.example`).
 3. **Infraestructura** (MongoDB con Vector Search, Redis y MinIO — no las apps, ver la nota más abajo):
    ```bash
    docker compose up -d
@@ -119,8 +119,15 @@ El aislamiento multi-usuario y multi-documento (RNF-01) se garantiza directament
 **Embeddings (Voyage AI)**
 
 - Modelo `voyage-3-lite`, 512 dimensiones, vía la API de Voyage AI.
-- Motivos: Voyage es el proveedor de embeddings recomendado por Anthropic, lo que da una integración coherente con el resto del stack (la generación ya usa la API de Claude); su tier gratuito es amplio, así que la demo pública funciona sin pedir tarjeta de crédito; y 512 dimensiones pesan menos en el índice vectorial que las 1536 por defecto de OpenAI, ayudando a mantenerse dentro de los límites del tier gratuito de MongoDB Atlas.
+- Motivos: su tier gratuito es amplio, así que la demo pública funciona sin pedir tarjeta de crédito; y 512 dimensiones pesan menos en el índice vectorial que las 1536 por defecto de OpenAI, ayudando a mantenerse dentro de los límites del tier gratuito de MongoDB Atlas.
 - El modelo vive en la variable `EMBEDDINGS_MODEL`. Cambiarlo cambia las dimensiones del índice y obliga a regenerar los vectores existentes.
+
+**Generación (Groq · GPT-OSS 120B)**
+
+- Modelo `openai/gpt-oss-120b` vía la API de Groq (contrato compatible con OpenAI chat completions), llamado por HTTP directo desde `apps/api` (sin SDK) igual que el resto de integraciones externas del proyecto.
+- Motivo: pasó primero de Claude a Gemini (preferencia por su SDK/API), pero la API key de Gemini cayó en el tier gratuito de la API de desarrollador —distinto de la suscripción de consumo "Google AI Pro"— y devolvió 503 de alta demanda con dos modelos distintos. Se probó OpenRouter después, pero tres modelos `:free` distintos devolvieron el mismo 404 "unavailable for free" pese a tener cuota diaria intacta (confirmado con `GET /api/v1/key`), señal de un bloqueo de cuenta sobre los modelos gratuitos, no de un modelo puntual agotado. Se optó por Groq: su capa gratuita no usa créditos, solo límites de tasa por modelo, sin tarjeta ni verificación. Ver la decisión completa registrada el 2026-09-28 en [REQUIREMENTS.md, sección 10](./REQUIREMENTS.md#10-riesgos-y-decisiones-abiertas).
+- El cambio solo tocó el adaptador (`apps/api/src/modules/llm/repositories/groq-llm.provider.ts`); el puerto `LlmProvider` y el resto del flujo RAG (prompt, separación dato/instrucción de RNF-05, citas) no cambiaron en ninguno de los saltos de proveedor.
+- El modelo vive en `GROQ_MODEL` y la clave en `GROQ_API_KEY`.
 
 **MongoDB Atlas Vector Search**
 
@@ -141,8 +148,8 @@ El aislamiento multi-usuario y multi-documento (RNF-01) se garantiza directament
 
 **Costos de las APIs**
 
-- Modelo de generación pequeño y barato (`claude-haiku-4-5`).
-- Límite de gasto configurado directamente en las cuentas de Anthropic y Voyage AI (fuera del repositorio).
+- Generación en la capa gratuita de Groq (`openai/gpt-oss-120b`), que no usa créditos sino límites de tasa diarios por modelo.
+- Límite de gasto configurado directamente en la cuenta de Voyage AI (fuera del repositorio).
 - La caché de respuestas en Redis (RNF-09, ya implementada) reduce las llamadas repetidas al LLM y al servicio de embeddings.
 
 **CI (RNF-12)**

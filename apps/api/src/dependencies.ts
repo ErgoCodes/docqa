@@ -32,7 +32,7 @@ import { createMongoDocumentRepository } from './modules/documents/repositories/
 import type { EmbeddingsProvider } from './modules/embeddings/interfaces/embeddings-provider.js';
 import { createVoyageEmbeddingsProvider } from './modules/embeddings/repositories/voyage-embeddings.provider.js';
 import type { LlmProvider } from './modules/llm/interfaces/llm-provider.js';
-import { createClaudeLlmProvider } from './modules/llm/repositories/claude-llm.provider.js';
+import { createGroqLlmProvider } from './modules/llm/repositories/groq-llm.provider.js';
 
 export interface AppDependencies {
   users: UserRepository;
@@ -75,9 +75,9 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
       apiKey: config.VOYAGE_API_KEY,
       model: config.EMBEDDINGS_MODEL,
     }),
-    llmProvider: createClaudeLlmProvider({
-      apiKey: config.CLAUDE_API_KEY,
-      model: config.CLAUDE_MODEL,
+    llmProvider: createGroqLlmProvider({
+      apiKey: config.GROQ_API_KEY,
+      model: config.GROQ_MODEL,
     }),
     responseCache: createRedisResponseCache(redisConnection),
     hasher: createArgon2Hasher({
