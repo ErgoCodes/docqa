@@ -27,6 +27,7 @@ const configSchema = z.object({
   EMBEDDINGS_MODEL: z.string().min(1).default('voyage-3-lite'),
   GROQ_API_KEY: z.string().min(1),
   GROQ_MODEL: z.string().min(1).default('openai/gpt-oss-120b'),
+  RATE_LIMIT_QUESTIONS_PER_MINUTE: z.coerce.number().int().positive().default(20),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

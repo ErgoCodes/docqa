@@ -18,6 +18,7 @@ import type { ObjectStorage } from '../modules/documents/interfaces/object-stora
 import type { Document, NewDocument } from '../modules/documents/types/document.js';
 import type { EmbeddingsProvider } from '../modules/embeddings/interfaces/embeddings-provider.js';
 import type { LlmProvider } from '../modules/llm/interfaces/llm-provider.js';
+import type { RateLimiter, RateLimitResult } from '../modules/rate-limit/interfaces/rate-limiter.js';
 
 export function createInMemoryUserRepository(): UserRepository {
   const usersByEmail = new Map<string, User>();
@@ -240,6 +241,18 @@ export function createInMemoryResponseCache(): ResponseCache {
   };
 }
 
+export function createInMemoryRateLimiter(limit = Number.POSITIVE_INFINITY): RateLimiter {
+  const counts = new Map<string, number>();
+
+  return {
+    consume: (key: string): Promise<RateLimitResult> => {
+      const count = (counts.get(key) ?? 0) + 1;
+      counts.set(key, count);
+      return Promise.resolve({ allowed: count <= limit, retryAfterSeconds: 60 });
+    },
+  };
+}
+
 export function createInMemoryDependencies(): AppDependencies {
   return {
     users: createInMemoryUserRepository(),
@@ -254,6 +267,7 @@ export function createInMemoryDependencies(): AppDependencies {
     embeddingsProvider: createInMemoryEmbeddingsProvider(),
     llmProvider: createInMemoryLlmProvider(),
     responseCache: createInMemoryResponseCache(),
+    questionRateLimiter: createInMemoryRateLimiter(),
     // Argon2 real con memoryCost mínimo, no un mock: cubre el camino
     // crítico sin pagar su coste en cada test (~1-5ms por hash).
     hasher: createArgon2Hasher({ memoryCost: 8, timeCost: 1, parallelism: 1 }),

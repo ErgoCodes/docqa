@@ -28,6 +28,7 @@ export function createTestConfig(overrides: Partial<AppConfig> = {}): AppConfig 
     EMBEDDINGS_MODEL: 'voyage-3-lite',
     GROQ_API_KEY: 'test-groq-key',
     GROQ_MODEL: 'openai/gpt-oss-120b',
+    RATE_LIMIT_QUESTIONS_PER_MINUTE: 20,
     ...overrides,
   };
 }
