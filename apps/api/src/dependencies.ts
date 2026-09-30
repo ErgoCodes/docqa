@@ -33,6 +33,8 @@ import type { EmbeddingsProvider } from './modules/embeddings/interfaces/embeddi
 import { createVoyageEmbeddingsProvider } from './modules/embeddings/repositories/voyage-embeddings.provider.js';
 import type { LlmProvider } from './modules/llm/interfaces/llm-provider.js';
 import { createGroqLlmProvider } from './modules/llm/repositories/groq-llm.provider.js';
+import type { RateLimiter } from './modules/rate-limit/interfaces/rate-limiter.js';
+import { createRedisRateLimiter } from './modules/rate-limit/repositories/redis-rate-limiter.js';
 
 export interface AppDependencies {
   users: UserRepository;
@@ -47,6 +49,7 @@ export interface AppDependencies {
   embeddingsProvider: EmbeddingsProvider;
   llmProvider: LlmProvider;
   responseCache: ResponseCache;
+  questionRateLimiter: RateLimiter;
   hasher: PasswordHasher;
   close: () => Promise<void>;
 }
@@ -80,6 +83,10 @@ export async function createAppDependencies(config: AppConfig): Promise<AppDepen
       model: config.GROQ_MODEL,
     }),
     responseCache: createRedisResponseCache(redisConnection),
+    questionRateLimiter: createRedisRateLimiter(redisConnection, {
+      limit: config.RATE_LIMIT_QUESTIONS_PER_MINUTE,
+      windowSeconds: 60,
+    }),
     hasher: createArgon2Hasher({
       memoryCost: config.ARGON2_MEMORY_COST,
       timeCost: config.ARGON2_TIME_COST,

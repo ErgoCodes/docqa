@@ -25,6 +25,7 @@ describe('loadConfig', () => {
     expect(config.ACCESS_TOKEN_TTL_SECONDS).toBe(900);
     expect(config.REFRESH_TOKEN_TTL_DAYS).toBe(7);
     expect(config.GROQ_MODEL).toBe('openai/gpt-oss-120b');
+    expect(config.RATE_LIMIT_QUESTIONS_PER_MINUTE).toBe(20);
   });
 
   it('lanza con un mensaje legible cuando falta JWT_SECRET', () => {

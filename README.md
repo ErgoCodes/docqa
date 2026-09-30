@@ -142,9 +142,13 @@ El aislamiento multi-usuario y multi-documento (RNF-01) se garantiza directament
 - Invalidación sin `SCAN`/`DEL` masivo: un contador de "generación" por usuario en Redis (`cache:gen:<userId>`), incrementado con `INCR` al subir o borrar un documento (`DocumentService`). Como la generación forma parte de la clave, subir o borrar un documento invalida implícitamente todas las respuestas cacheadas de ese usuario.
 - La cabecera `X-Cache` (`HIT`/`MISS`) se expone en `POST /conversations/:id/messages`.
 
-**Rate limiting (RNF-04)** — pendiente
+**Rate limiting (RNF-04)** — implementado
 
-- Todavía no hay una dependencia de limitación de tasa (por ejemplo `@fastify/rate-limit`) ni código propio que limite peticiones por usuario en la API. Se documenta así de forma explícita en vez de darlo por hecho.
+- Límite de 20 preguntas por minuto por usuario (`RATE_LIMIT_QUESTIONS_PER_MINUTE`), aplicado solo a `POST /conversations/:id/messages`, que es lo que RNF-04 limita: preguntas, no peticiones en general. Al superarlo, la API responde 429 con el código `RATE_LIMIT_EXCEEDED` y la cabecera `Retry-After`.
+- Ventana fija de 60 s en Redis: `INCR` sobre `ratelimit:question:<userId>` y `EXPIRE ... NX` en la misma transacción `MULTI`, de modo que el primer intento abre la ventana y las ráfagas posteriores no la alargan (`apps/api/src/modules/rate-limit/repositories/redis-rate-limiter.ts`).
+- Código propio en lugar de `@fastify/rate-limit`: la clave es el `userId` del token, que solo existe después de `authenticate`; el limitador corre como `preHandler` justo detrás de la autenticación, y el contador vive en el mismo Redis que la caché y la cola.
+- Las respuestas servidas desde caché también cuentan: el límite protege tanto el coste del LLM como el abuso del endpoint.
+- Compromiso conocido: con ventana fija, un usuario puede hacer hasta 40 preguntas en pocos segundos si las concentra justo alrededor del cambio de ventana. Para una demo es aceptable; una ventana deslizante (sorted set) lo evitaría a costa de más escrituras.
 
 **Costos de las APIs**
 

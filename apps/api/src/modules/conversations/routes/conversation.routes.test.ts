@@ -3,7 +3,11 @@ import type { FastifyInstance } from 'fastify';
 import { PDFDocument } from 'pdf-lib';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildTestApp } from '../../../testing/build-test-app.js';
-import { createInMemoryChunkSearcher, createInMemoryLlmProvider } from '../../../testing/fakes.js';
+import {
+  createInMemoryChunkSearcher,
+  createInMemoryLlmProvider,
+  createInMemoryRateLimiter,
+} from '../../../testing/fakes.js';
 
 interface ConversationResponseBody {
   id: string;
@@ -424,6 +428,45 @@ describe('conversation routes', () => {
       expect(res.statusCode).toBe(404);
       const body = res.json<ErrorResponseBody>();
       expect(body.error.code).toBe('CONVERSATION_NOT_FOUND');
+    });
+
+    it('RNF-04: returns 429 with Retry-After once a user exceeds the question limit, without affecting other users', async () => {
+      ({ app } = await buildTestApp({ dependencies: { questionRateLimiter: createInMemoryRateLimiter(2) } }));
+      const token = await registerAndGetToken(app, 'user-limited@example.com');
+      const otherToken = await registerAndGetToken(app, 'user-other@example.com');
+
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        headers: { authorization: `Bearer ${token}` },
+        payload: {},
+      });
+      const conv = createRes.json<ConversationResponseBody>();
+      const otherCreateRes = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        headers: { authorization: `Bearer ${otherToken}` },
+        payload: {},
+      });
+      const otherConv = otherCreateRes.json<ConversationResponseBody>();
+
+      const ask = (bearer: string, conversationId: string) =>
+        app!.inject({
+          method: 'POST',
+          url: `/conversations/${conversationId}/messages`,
+          headers: { authorization: `Bearer ${bearer}` },
+          payload: { question: 'Any question?' },
+        });
+
+      expect((await ask(token, conv.id)).statusCode).toBe(200);
+      expect((await ask(token, conv.id)).statusCode).toBe(200);
+
+      const limitedRes = await ask(token, conv.id);
+      expect(limitedRes.statusCode).toBe(429);
+      expect(limitedRes.headers['retry-after']).toBe('60');
+      expect(limitedRes.json<ErrorResponseBody>().error.code).toBe('RATE_LIMIT_EXCEEDED');
+
+      expect((await ask(otherToken, otherConv.id)).statusCode).toBe(200);
     });
 
     it('returns 404 CONVERSATION_NOT_FOUND when conversation does not exist', async () => {

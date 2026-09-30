@@ -68,7 +68,10 @@ export async function buildServer(options: BuildServerOptions): Promise<FastifyI
   await app.register(registerAuthRoutes, { service: authService });
   await app.register(registerDocumentRoutes, { service: documentService });
   await app.register(registerChunkRoutes, { service: chunkService });
-  await app.register(registerConversationRoutes, { service: conversationService });
+  await app.register(registerConversationRoutes, {
+    service: conversationService,
+    questionRateLimiter: dependencies.questionRateLimiter,
+  });
 
   return app;
 }
