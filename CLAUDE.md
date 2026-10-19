@@ -57,8 +57,8 @@ pnpm lint                # ESLint en todos los paquetes
 - Cobertura mínima del 80% en lógica de dominio (fragmentación, prompt, claves de
   caché, citas) — no en el proyecto entero.
 - El código (identificadores, mensajes de error internos, y cualquier comentario)
-  se escribe en inglés, aunque la documentación del repo (README, REQUIREMENTS.md,
-  este archivo, los mensajes de commit) siga en español.
+  se escribe en inglés. El README también va en inglés (es la cara pública del
+  repo); REQUIREMENTS.md, este archivo y los mensajes de commit siguen en español.
 - Evita comentarios en el código: por defecto, ninguno. Un comentario solo se
   justifica para documentar una razón no obvia (una restricción oculta, un
   workaround puntual, por qué se descartó la alternativa evidente) — nunca para
