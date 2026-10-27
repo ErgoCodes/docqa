@@ -2,7 +2,6 @@ import * as React from 'react';
 import { Link } from '@tanstack/react-router';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useDocuments } from '@/documents/useDocuments';
 import { MessageList } from './MessageList';
@@ -70,7 +69,8 @@ export function ConversationPanel({ conversationId }: ConversationPanelProps) {
 
   if (isLoading) {
     return (
-      <div className="flex h-[80vh] items-center justify-center">
+      <div className="flex h-[75vh] flex-col items-center justify-center gap-3">
+        <span className="size-3 rounded-full bg-primary animate-pulse" />
         <p className="text-muted-foreground text-sm">Cargando conversación...</p>
       </div>
     );
@@ -78,7 +78,7 @@ export function ConversationPanel({ conversationId }: ConversationPanelProps) {
 
   if (isError || !conversation) {
     return (
-      <div className="flex h-[80vh] flex-col items-center justify-center gap-4">
+      <div className="flex h-[75vh] flex-col items-center justify-center gap-4 max-w-md mx-auto text-center px-4">
         <ErrorBanner
           title="Error al cargar la conversación"
           message={error?.message || 'Conversación no encontrada'}
@@ -97,33 +97,48 @@ export function ConversationPanel({ conversationId }: ConversationPanelProps) {
       : `${conversation.documentIds.length} ${conversation.documentIds.length === 1 ? 'documento' : 'documentos'}`;
 
   return (
-    <Card className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden py-0">
-      {/* Header */}
-      <div className="border-b bg-muted/30 flex items-center justify-between px-6 py-3">
+    <div className="flex h-[calc(100vh-7.5rem)] flex-col max-w-4xl mx-auto">
+      {/* Sticky Top Header */}
+      <div className="flex items-center justify-between border-b border-border/60 pb-3 px-2 sm:px-4">
         <div className="flex items-center gap-3">
           <Link
             to="/"
-            className="text-muted-foreground hover:text-foreground text-sm font-medium"
+            className="text-muted-foreground hover:text-foreground text-xs sm:text-sm font-medium inline-flex items-center gap-1 transition-colors"
           >
-            ← Volver
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-4"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            <span>Volver</span>
           </Link>
-          <div className="h-4 w-px bg-border" />
-          <h2 className="text-sm font-semibold">
-            Conversación <span className="text-muted-foreground font-normal">({scopeText})</span>
+          <div className="h-4 w-px bg-border/80" />
+          <h2 className="text-xs sm:text-sm font-semibold truncate max-w-[280px] sm:max-w-md">
+            Conversación{' '}
+            <span className="text-muted-foreground font-normal">({scopeText})</span>
           </h2>
         </div>
       </div>
 
-      {/* Messages */}
-      <MessageList
-        messages={conversation.messages}
-        pendingQuestion={isPending ? pendingState.question : null}
-        documentsMap={documentsMap}
-      />
+      {/* Messages Stream */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <MessageList
+          messages={conversation.messages}
+          pendingQuestion={isPending ? pendingState.question : null}
+          documentsMap={documentsMap}
+        />
+      </div>
 
       {/* Error / Retry Banner */}
       {pendingState?.status === 'error' && (
-        <div className="px-4 pb-2">
+        <div className="px-4 pb-2 max-w-3xl mx-auto w-full">
           <ErrorBanner
             title={
               pendingState.isRefetchError
@@ -143,36 +158,57 @@ export function ConversationPanel({ conversationId }: ConversationPanelProps) {
         </div>
       )}
 
-      {/* Input composer */}
-      <div className="border-t bg-background p-4">
-        <form
-          onSubmit={(e) => {
-            void handleSend(e);
-          }}
-          className="flex gap-2"
-        >
-          <Textarea
-            value={inputQuestion}
-            onChange={(e) => setInputQuestion(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              isPending
-                ? 'Esperando respuesta de DocQA...'
-                : 'Haz una pregunta sobre los documentos (Enter para enviar)...'
-            }
-            disabled={isPending}
-            className="min-h-[44px] max-h-32 resize-none text-sm"
-            rows={1}
-          />
-          <Button
-            type="submit"
-            disabled={!inputQuestion.trim() || isPending}
-            className="shrink-0 self-end"
+      {/* Floating Bottom Composer */}
+      <div className="p-2 sm:p-4 bg-background/95 backdrop-blur-xs">
+        <div className="max-w-3xl mx-auto rounded-2xl border border-border/80 bg-card p-2 sm:p-3 shadow-lg transition-[border-color,box-shadow] duration-200 focus-within:border-ring/60 focus-within:ring-4 focus-within:ring-ring/10">
+          <form
+            onSubmit={(e) => {
+              void handleSend(e);
+            }}
+            className="flex flex-col gap-2"
           >
-            {isPending ? 'Enviando...' : 'Enviar'}
-          </Button>
-        </form>
+            <Textarea
+              value={inputQuestion}
+              onChange={(e) => setInputQuestion(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                isPending
+                  ? 'Esperando respuesta de DocQA...'
+                  : 'Haz una pregunta sobre los documentos (Enter para enviar)...'
+              }
+              disabled={isPending}
+              className="min-h-[50px] max-h-36 resize-none border-none bg-transparent p-1 text-sm shadow-none focus-visible:ring-0"
+              rows={1}
+            />
+            <div className="flex items-center justify-between border-t border-border/40 pt-2 px-1">
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                Shift + Enter para nueva línea
+              </span>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!inputQuestion.trim() || isPending}
+                className="gap-1.5 h-8 px-3 text-xs font-semibold ml-auto"
+              >
+                <span>{isPending ? 'Enviando...' : 'Enviar'}</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="size-3.5"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }

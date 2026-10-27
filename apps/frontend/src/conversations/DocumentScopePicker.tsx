@@ -3,14 +3,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { conversationsApi } from '@/api/conversations';
 import type { DocumentItem } from '@/api/types';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
@@ -49,70 +41,67 @@ export function DocumentScopePicker({ documents }: DocumentScopePickerProps) {
   const canStart = readyDocuments.length > 0 && (useAll || selectedIds.length > 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Nueva conversación</CardTitle>
-        <CardDescription>
-          Selecciona el alcance de documentos para consultar con el asistente RAG
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {readyDocuments.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No hay documentos listos aún. Espera a que termine el procesamiento o sube un nuevo archivo.
+    <div className="space-y-4">
+      {readyDocuments.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/80 p-4 text-center">
+          <p className="text-muted-foreground text-xs">
+            No hay documentos listos aún. Espera que termine el procesamiento o sube un PDF.
           </p>
-        ) : (
-          <>
-            <div className="flex items-center space-x-2 border-b pb-3">
-              <Checkbox
-                id="all-docs"
-                checked={useAll}
-                onCheckedChange={(checked) => {
-                  setUseAll(Boolean(checked));
-                  if (checked) setSelectedIds([]);
-                }}
-              />
-              <Label htmlFor="all-docs" className="font-semibold cursor-pointer">
-                Consultar todos los documentos disponibles ({readyDocuments.length})
-              </Label>
-            </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center space-x-2.5 rounded-lg border border-border/60 bg-secondary/30 p-3 transition-colors hover:bg-secondary/50">
+            <Checkbox
+              id="all-docs"
+              checked={useAll}
+              onCheckedChange={(checked) => {
+                setUseAll(Boolean(checked));
+                if (checked) setSelectedIds([]);
+              }}
+            />
+            <Label htmlFor="all-docs" className="font-medium text-sm cursor-pointer select-none">
+              Consultar todos los documentos disponibles ({readyDocuments.length})
+            </Label>
+          </div>
 
-            {!useAll && (
-              <div className="max-h-48 space-y-2 overflow-y-auto pt-1">
-                {readyDocuments.map((doc) => {
-                  const isChecked = selectedIds.includes(doc.id);
-                  return (
-                    <div key={doc.id} className="flex items-center space-x-2 py-1">
-                      <Checkbox
-                        id={`doc-${doc.id}`}
-                        checked={isChecked}
-                        onCheckedChange={() => toggleDocument(doc.id)}
-                      />
-                      <Label
-                        htmlFor={`doc-${doc.id}`}
-                        className="truncate text-sm font-normal cursor-pointer"
-                      >
-                        {doc.title} ({doc.pages} pág.)
-                      </Label>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-      <CardFooter>
-        <Button
-          onClick={() => {
-            void handleStartConversation();
-          }}
-          disabled={!canStart || isCreating}
-          className="w-full sm:w-auto"
-        >
-          {isCreating ? 'Iniciando...' : 'Iniciar conversación'}
-        </Button>
-      </CardFooter>
-    </Card>
+          {!useAll && (
+            <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-border/60 p-2 bg-card">
+              {readyDocuments.map((doc) => {
+                const isChecked = selectedIds.includes(doc.id);
+                return (
+                  <div
+                    key={doc.id}
+                    className="flex items-center space-x-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-secondary/50"
+                  >
+                    <Checkbox
+                      id={`doc-${doc.id}`}
+                      checked={isChecked}
+                      onCheckedChange={() => toggleDocument(doc.id)}
+                    />
+                    <Label
+                      htmlFor={`doc-${doc.id}`}
+                      className="truncate text-sm font-normal cursor-pointer select-none flex-1"
+                    >
+                      {doc.title}{' '}
+                      <span className="text-muted-foreground text-xs">({doc.pages} pág.)</span>
+                    </Label>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      <Button
+        onClick={() => {
+          void handleStartConversation();
+        }}
+        disabled={!canStart || isCreating}
+        className="w-full h-10 font-semibold"
+      >
+        {isCreating ? 'Iniciando conversación...' : 'Iniciar conversación'}
+      </Button>
+    </div>
   );
 }
