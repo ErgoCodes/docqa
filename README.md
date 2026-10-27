@@ -4,7 +4,7 @@ A RAG assistant for your documents: upload a PDF, ask it questions in plain lang
 
 ## Status
 
-End-to-end working MVP: sign-up and login, PDF upload with background processing, questions over one or several documents with cited answers (click a citation to see the source passage), conversation history, response caching and a per-minute question limit. Still pending: the demo GIF and choosing where to host a public demo.
+End-to-end working MVP: sign-up and login, PDF upload with background processing, questions over one or several documents with cited answers (click a citation to see the source passage), conversation history, response caching and a per-minute question limit. Pending: choosing where to host a public demo (optional for the MVP). Task board: [DocQA on Notion](https://app.notion.com/p/3e019c33c39081348924d13fbfd11d15).
 
 ## Requirements
 
@@ -139,7 +139,9 @@ Isolation between users and documents (NFR-01) is enforced by the database itsel
 
 ## Demo
 
-GIF still to be recorded. The full flow already works in the UI (upload a PDF, wait until it's "ready", ask a question and open a citation), so you can reproduce it locally by following "Running it".
+![DocQA demo: sign-up, PDF upload, question with cited answer and opening the cited passage](./docs/demo.gif)
+
+Full local walkthrough: create an account, upload a 3-page PDF, wait until it transitions from "Processing" to "Ready", ask a question across all documents, and open one of the citations to inspect the exact passage (document and page). Processing and LLM response wait times are trimmed in the GIF; everything else runs at real-time speed.
 
 ## How AI was used in development
 

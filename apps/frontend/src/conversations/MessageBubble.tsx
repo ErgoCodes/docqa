@@ -1,3 +1,4 @@
+import * as React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { DocumentItem, Message } from '@/api/types';
@@ -14,23 +15,33 @@ export function MessageBubble({ message, documentsMap }: MessageBubbleProps) {
 
   return (
     <div
-      className={cn('flex flex-col', isUser ? 'items-end' : 'items-start')}
+      className={cn(
+        'flex flex-col animate-message-enter w-full max-w-3xl mx-auto',
+        isUser ? 'items-end' : 'items-start',
+      )}
       data-role={message.role}
     >
       <div
         className={cn(
-          'max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-xs',
+          'relative text-sm transition-[border-color,background-color] duration-150',
           isUser
-            ? 'bg-primary text-primary-foreground rounded-tr-none'
-            : 'bg-card text-card-foreground border rounded-tl-none',
+            ? 'max-w-[85%] sm:max-w-[75%] rounded-2xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-3 shadow-2xs'
+            : 'w-full rounded-2xl border border-border/60 bg-card px-5 py-4 text-card-foreground shadow-xs',
         )}
       >
-        <div className="mb-1 text-[11px] font-semibold opacity-70">
-          {isUser ? 'Tú' : 'DocQA'}
+        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide uppercase opacity-65">
+          {isUser ? (
+            <span>Tú</span>
+          ) : (
+            <div className="flex items-center gap-1.5 text-primary">
+              <span className="size-2 rounded-full bg-primary" />
+              <span>DocQA</span>
+            </div>
+          )}
         </div>
 
         {isUser ? (
-          <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          <div className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</div>
         ) : (
           <div className="prose prose-sm dark:prose-invert max-w-none break-words leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -44,7 +55,7 @@ export function MessageBubble({ message, documentsMap }: MessageBubbleProps) {
         )}
       </div>
 
-      <span className="text-muted-foreground mt-1 px-1 text-[10px]">
+      <span className="text-muted-foreground/80 mt-1 px-1.5 text-[10px] tabular-nums">
         {new Date(message.createdAt).toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',

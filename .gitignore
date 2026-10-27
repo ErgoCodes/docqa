@@ -9,3 +9,4 @@ coverage/
 .turbo/
 .vite/
 pnpm-lock.yaml.bak
+.claude/worktrees/
